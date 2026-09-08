@@ -19,7 +19,13 @@
       methods = $state(null), err = $state(null), demo = $state(false);
 
   let layer = $state('crime');       // crime | hazard
-  let category = $state('mugging');
+  // 'any' is the default because per-category is where the coverage dies: a
+  // ward's reports get split 12 ways before the threshold is applied.
+  let category = $state('any');
+  // The geography the reader asked for. Thana by default: 46 units instead of
+  // 203, so the same reports clear the threshold in far more places. A
+  // category's own rule can still force something coarser, never finer.
+  let geo = $state('thana');
   let period = $state('all');        // all | day | night
   let view = $state('map');          // map | table
   // Start optimistic: BaseMap flips this off if the PMTiles archives are not
@@ -43,24 +49,43 @@
           j('/data/hazards.json'), j('/data/methods.json'),
         ]);
       demo = agg?.demo === true;
+      applyHash();   // after data, so a linked area resolves to a name
     } catch (e) { err = String(e); }
   });
 
   const DAY = ['morning', 'afternoon'];
   const NIGHT = ['evening', 'night'];
 
-  const level = $derived(agg?.geo_levels?.[category] ?? 'ward');
+  const RANK = { ward: 0, thana: 1, district: 2 };
+  const ruleLevel = $derived(
+    category === 'any' ? 'ward' : (agg?.geo_levels?.[category] ?? 'ward'));
+  // Never finer than the category's rule; otherwise honour the reader.
+  const level = $derived(RANK[geo] > RANK[ruleLevel] ? geo : ruleLevel);
   const shapes = $derived(level === 'ward' ? wardGeo : level === 'thana' ? thanaGeo : null);
+  // Day/night comes from the sliced cells, which only exist at ward level.
+  const canSplitTime = $derived(ruleLevel === 'ward' && level === 'ward' && category !== 'any');
 
   const byArea = $derived.by(() => {
     const m = new Map();
     if (!agg) return m;
+
+    // The default path. `rollups` are totals over every month and time band,
+    // each one threshold-checked in its own right by the database. Summing
+    // published cells here instead would undercount, because a suppressed cell
+    // arrives as null and its reports would silently vanish from the total.
+    if (period === 'all') {
+      for (const r of agg.rollups ?? []) {
+        if (r.l !== level || r.c !== category) continue;
+        m.set(r.a, { n: r.n, suppressed: r.s });
+      }
+      return m;
+    }
+
+    // Day/night: the sliced cells, which exist only per category at ward level.
     for (const c of agg.cells) {
       if (c.c !== category) continue;
-      if (level === 'ward') {
-        if (period === 'day' && !DAY.includes(c.t)) continue;
-        if (period === 'night' && !NIGHT.includes(c.t)) continue;
-      }
+      if (period === 'day' && !DAY.includes(c.t)) continue;
+      if (period === 'night' && !NIGHT.includes(c.t)) continue;
       const cur = m.get(c.a) ?? { n: null, suppressed: false };
       if (c.n === null) cur.suppressed = true;
       else cur.n = (cur.n ?? 0) + c.n;
@@ -106,13 +131,17 @@
 
   const totals = $derived.by(() => {
     if (!agg || !press) return null;
-    const crowd = agg.cells.filter(c => c.c === category).reduce((s, c) => s + (c.n ?? 0), 0);
-    const pr = press.cells.filter(c => c.c === category).reduce((s, c) => s + c.n, 0);
+    const inScope = (c) => category === 'any' ? areaCrime().includes(c) : c === category;
+    const crowd = agg.cells.filter(c => inScope(c.c)).reduce((s, c) => s + (c.n ?? 0), 0);
+    const pr = press.cells.filter(c => inScope(c.c)).reduce((s, c) => s + c.n, 0);
     return { crowd, press: pr };
   });
 
   const wardOf = (id) => wards?.wards.find(x => String(x.id) === String(id)) ?? null;
   const thanaOf = (id) => thanas?.thanas.find(x => String(x.id) === String(id)) ?? null;
+
+  // 'any' is a view, not a taxonomy entry, so it has no labels.js row.
+  const catLabel = $derived(category === 'any' ? t.cat_any : L[category]);
 
   const areaName = (id) => {
     if (level === 'ward') {
@@ -206,6 +235,52 @@
     hazTypes = next;
   }
 
+  // --- shareable state -------------------------------------------------------
+  // The whole point of a local safety map is showing it to the person who lives
+  // there. Without this, "look at Badda" is a screenshot; with it, it is a link.
+  // Kept in the hash so it never reaches a server log — the URL of a page about
+  // who is being extorted where should not sit in someone's access log.
+  let copied = $state(false);
+
+  function stateToHash() {
+    const p = new URLSearchParams();
+    if (layer !== 'crime') p.set('layer', layer);
+    if (category !== 'any') p.set('c', category);
+    if (geo !== 'thana') p.set('g', geo);
+    if (period !== 'all') p.set('t', period);
+    if (selected != null) p.set('a', String(selected));
+    return p.toString();
+  }
+
+  function applyHash() {
+    if (typeof location === 'undefined' || !location.hash) return;
+    const p = new URLSearchParams(location.hash.slice(1));
+    const l = p.get('layer'); if (l === 'hazard' || l === 'crime') layer = l;
+    const c = p.get('c'); if (c) category = c;
+    const g = p.get('g'); if (g === 'ward' || g === 'thana') geo = g;
+    const tt = p.get('t'); if (tt) period = tt;
+    const a = p.get('a'); if (a) selected = a;
+  }
+
+  $effect(() => {
+    const h = stateToHash();
+    if (typeof history === 'undefined') return;
+    const url = h ? `#${h}` : location.pathname;
+    history.replaceState(null, '', url);
+  });
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(location.href);
+      copied = true;
+      setTimeout(() => (copied = false), 1600);
+    } catch { /* clipboard blocked; the URL bar already shows the link */ }
+  }
+
+  // A time split that the current level cannot serve would silently show an
+  // empty map, so it is dropped rather than left dangling.
+  $effect(() => { if (!canSplitTime && period !== 'all') period = 'all'; });
+
   const detail = $derived(selected ?? hovered);
   function pick(id) { selected = String(selected) === String(id) ? null : id; }
 </script>
@@ -232,7 +307,13 @@
     <button class:on={layer === 'crime'} onclick={() => { layer = 'crime'; selected = null; }}>{t.layer_crime}</button>
     <button class:on={layer === 'hazard'} onclick={() => { layer = 'hazard'; selected = null; }}>{t.layer_hazard}</button>
   </div>
-  {#if layer === 'crime' && level === 'ward'}
+  {#if layer === 'crime'}
+    <div class="seg">
+      <button class:on={geo === 'thana'} onclick={() => { geo = 'thana'; selected = null; }}>{t.geo_thana}</button>
+      <button class:on={geo === 'ward'} onclick={() => { geo = 'ward'; selected = null; }}>{t.geo_ward}</button>
+    </div>
+  {/if}
+  {#if layer === 'crime' && canSplitTime}
     <div class="seg">
       <button class:on={period === 'all'} onclick={() => (period = 'all')}>{t.all_time}</button>
       <button class:on={period === 'day'} onclick={() => (period = 'day')}>☀ {t.day}</button>
@@ -254,6 +335,8 @@
 
 {#if layer === 'crime'}
   <div class="cats">
+    <button class="chip any" class:on={category === 'any'}
+      onclick={() => { category = 'any'; selected = null; }}>{t.cat_any}</button>
     {#each areaCrime() as c}
       <button class="chip" class:on={category === c}
         onclick={() => { category = c; selected = null; }}>{L[c]}</button>
@@ -265,7 +348,9 @@
     {/each}
   </div>
 
-  {#if level !== 'ward'}<p class="note">{t.coarse_note}</p>{/if}
+  <!-- Only when the CATEGORY forces a coarser view. Thana-by-choice is not a
+       privacy constraint and saying so here made the notice meaningless. -->
+  {#if ruleLevel !== 'ward'}<p class="note">{t.coarse_note}</p>{/if}
 
   {#if totals}
     <div class="counters">
@@ -306,6 +391,19 @@
     </tbody>
   </table>
 {:else}
+  <div class="maptools">
+    <input class="search" bind:value={query} placeholder={t.search_area}
+           aria-label={t.search_area} />
+    {#if query.trim() && matches.length}
+      <ul class="hits">
+        {#each matches.slice(0, 6) as r}
+          <li><button onclick={() => { pick(r.id); query = ''; }}>{r.name}</button></li>
+        {/each}
+      </ul>
+    {/if}
+    <a class="cta" href="/submit/">{t.report_here}</a>
+  </div>
+
   <div class="layout">
     <div class="mapwrap">
       {#if tiled && !(layer === 'crime' && level === 'district')}
@@ -423,19 +521,26 @@
             {#if w?.upazila}<div class="psub">{t.thana_label}: {w.upazila}</div>{/if}
           </div>
           {#if selected != null}
-            <button class="x" onclick={() => (selected = null)} aria-label={t.close}>×</button>
+            <div class="pactions">
+              <button class="linkbtn" onclick={copyLink}>{copied ? t.link_copied : t.copy_link}</button>
+              <button class="x" onclick={() => (selected = null)} aria-label={t.close}>×</button>
+            </div>
           {/if}
         </div>
 
         {#if !v || (v.n === null && !v.suppressed)}
-          <div class="pbig zero">{num(0, ui.lang)}<span class="unit">{t.reports_unit}</span></div>
-          <div class="psub">{L[category]}</div>
+          <!-- "0" told the reader nothing and read as "this place is safe",
+               which is not what an empty cell means. Say what is true and give
+               them the one action that changes it. -->
+          <div class="pbig muted">{t.no_reports_yet}</div>
+          <div class="psub">{catLabel}</div>
+          <a class="cta wide" href="/submit/">{t.be_first}</a>
         {:else if v.n === null}
           <div class="pbig muted">{t.insufficient}</div>
-          <div class="psub">{L[category]}</div>
+          <div class="psub">{catLabel}</div>
         {:else}
           <div class="pbig">{num(v.n, ui.lang)}<span class="unit">{t.reports_unit}</span></div>
-          <div class="psub">{L[category]}
+          <div class="psub">{catLabel}
             {#if st}· {st.months <= 1 ? t.in_one_month : fill1(t.in_last_months, num(st.months, ui.lang))}{/if}
           </div>
 
@@ -563,6 +668,36 @@
 
   .mapwrap { position: relative; background: var(--panel); border: 1px solid var(--line);
     border-radius: 12px; overflow: hidden; }
+
+  /* Search and the report button sit directly above the map, because those are
+     the two things a visitor does here: find their area, or add to it. */
+  .maptools { position: relative; display: flex; gap: .5rem; margin: .1rem 0 .5rem; }
+  .maptools .search { flex: 1; min-width: 0; }
+  .maptools .hits {
+    position: absolute; top: 100%; left: 0; right: 5.5rem; z-index: 5;
+    margin: .25rem 0 0; padding: .25rem; list-style: none;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.45);
+  }
+  .maptools .hits button {
+    display: block; width: 100%; text-align: left; padding: .4rem .5rem;
+    background: none; border: 0; color: var(--ink); cursor: pointer;
+    border-radius: 7px; font: inherit;
+  }
+  .maptools .hits button:hover { background: var(--line); }
+  .cta {
+    display: inline-flex; align-items: center; white-space: nowrap;
+    padding: .45rem .8rem; border-radius: 999px; text-decoration: none;
+    background: var(--accent); color: #17130a; font-weight: 700;
+  }
+  .cta.wide { display: flex; justify-content: center; margin-top: .6rem; }
+  .chip.any { border-style: solid; font-weight: 700; }
+  .pactions { display: flex; align-items: center; gap: .25rem; }
+  .linkbtn {
+    background: none; border: 1px solid var(--line); color: var(--dim);
+    border-radius: 999px; padding: .15rem .5rem; font-size: .72rem; cursor: pointer;
+  }
+  .linkbtn:hover { color: var(--ink); }
   svg { width: 100%; height: auto; display: block; }
   path { cursor: pointer; transition: fill .25s ease, stroke-width .12s; }
   path:focus-visible { outline: none; stroke: var(--accent); stroke-width: 2; }

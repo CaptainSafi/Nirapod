@@ -15,6 +15,7 @@
   // they are.
 
   import { style } from '$lib/mapstyle.js';
+  import MapLabels from '$lib/MapLabels.svelte';
 
   let {
     base = '/dhaka.pmtiles',
@@ -39,7 +40,7 @@
   } = $props();
 
   let container;
-  let map = null;
+  let map = $state(null);
   let ready = $state(false);
   let lastHover = null;
   let prevSelected = null;
@@ -239,6 +240,8 @@
 
 <div class="map" bind:this={container} role="application"
      aria-label={demo ? 'Dhaka map, demo data' : 'Dhaka map'}>
+  <!-- Place and ward names are HTML, not map glyphs: see MapLabels.svelte. -->
+  <MapLabels {map} {ready} {lang} />
   {#if demo && watermark}
     <!-- Inside the map container on purpose: a screenshot of the map is a
          screenshot of the watermark. -->

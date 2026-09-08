@@ -140,10 +140,13 @@ export function style({
         minzoom: 10,
         paint: { 'line-color': C.wardline, 'line-width': 0.6 } },
 
+      // Thanas are large, so the same opacity that reads as a tint over a ward
+      // blankets the city and hides the streets underneath. Lighter by default,
+      // and it still lifts on hover so the area under the cursor is unambiguous.
       { id: 'thana-fill', type: 'fill', source: 'admin', 'source-layer': 'thanas',
         paint: {
           'fill-color': ['coalesce', ['feature-state', 'color'], 'rgba(0,0,0,0)'],
-          'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.9, 0.68],
+          'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.82, 0.5],
         } },
 
       { id: 'thana-suppressed', type: 'fill', source: 'admin', 'source-layer': 'thanas',
@@ -187,7 +190,11 @@ export function style({
       // above that they are noise, and every label costs a glyph fetch.
       { id: 'road-labels', type: 'symbol', source: 'base', 'source-layer': 'roads',
         minzoom: 14,
-        filter: ['all', ['has', 'name'],
+        // `latin` is set at tile-build time for ASCII-only names. A Bengali
+        // name drawn by the map engine comes out mis-shaped (no reordering, no
+        // conjuncts), and a name following a curve cannot be drawn as HTML, so
+        // those roads simply go unlabelled and the panel names them instead.
+        filter: ['all', ['has', 'name'], ['==', ['get', 'latin'], 1],
                  ['!=', ['get', 'kind'], 'path']],
         layout: {
           'text-field': NAME,
@@ -203,7 +210,7 @@ export function style({
 
       // Water names, so the rivers and lakes are identifiable.
       { id: 'water-labels', type: 'symbol', source: 'base', 'source-layer': 'water',
-        minzoom: 11, filter: ['has', 'name'],
+        minzoom: 11, filter: ['all', ['has', 'name'], ['==', ['get', 'latin'], 1]],
         layout: {
           'text-field': NAME, 'text-font': FONT,
           'text-size': ['interpolate', ['linear'], ['zoom'], 11, 10, 15, 13],
@@ -211,38 +218,12 @@ export function style({
         },
         paint: { 'text-color': '#6f8ba3', 'text-halo-color': C.halo,
                  'text-halo-width': 1.2 } },
-
-      // Neighbourhood and area names. Sized by kind so ঢাকা does not compete
-      // with a mohalla, and given a wide padding so labels do not pile up.
-      { id: 'place-labels', type: 'symbol', source: 'base', 'source-layer': 'places',
-        layout: {
-          'text-field': NAME,
-          'text-font': FONT,
-          'text-size': ['interpolate', ['linear'], ['zoom'],
-            9,  ['match', ['get', 'kind'], 'city', 15, 'town', 12, 10],
-            15, ['match', ['get', 'kind'], 'city', 24, 'town', 19, 15]],
-          'text-max-width': 7,
-          'text-padding': 6,
-          // Bigger places win when labels collide.
-          'symbol-sort-key': ['match', ['get', 'kind'],
-            'city', 1, 'town', 2, 'suburb', 3, 'quarter', 4, 'village', 5, 6],
-        },
-        paint: { 'text-color': '#d7dee5', 'text-halo-color': C.halo,
-                 'text-halo-width': 1.8 } },
-
-      // Ward numbers, on top of everything, in the site's accent so they read as
-      // the site's own layer rather than as part of the borrowed basemap.
-      { id: 'ward-labels', type: 'symbol', source: 'admin', 'source-layer': 'wards',
-        minzoom: 12,
-        layout: {
-          'text-field': NAME, 'text-font': FONT,
-          'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 16, 14],
-          'text-max-width': 8, 'text-padding': 4,
-        },
-        paint: { 'text-color': '#e8d9a8', 'text-halo-color': C.halo,
-                 'text-halo-width': 1.8 } },
     );
   }
+
+  // Place and ward names are NOT here on purpose. MapLibre cannot shape
+  // Bengali, so those are drawn as HTML by MapLabels.svelte, which gets the
+  // browser's text shaper for free.
 
   return s;
 }

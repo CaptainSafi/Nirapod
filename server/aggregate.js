@@ -30,6 +30,7 @@ export async function publish(db, outDir, { seedsDir, demo = false } = {}) {
   await mkdir(outDir, { recursive: true });
 
   const cells = (await db.query(`SELECT * FROM public_cells()`)).rows;
+  const rollups = (await db.query(`SELECT * FROM public_rollups()`)).rows;
   const hazards = (await db.query(`SELECT * FROM public_hazards()`)).rows;
   const methods = (await db.query(`SELECT * FROM public_method_patterns()`)).rows;
   const scorecards = (await db.query(`SELECT * FROM public_thana_scorecards()`)).rows;
@@ -65,6 +66,35 @@ export async function publish(db, outDir, { seedsDir, demo = false } = {}) {
     }
   }
 
+  // Rollups get the same belt-and-braces treatment as cells. `any` is checked
+  // against the strictest ward threshold, because that is what the database
+  // used, and a rollup may never be finer than the category's own rule.
+  const anyK = Math.max(...Object.entries(kFor)
+    .filter(([c]) => geoFor[c] === 'ward').map(([, k]) => k));
+  const LEVEL_RANK = { ward: 0, thana: 1, district: 2 };
+  for (const r of rollups) {
+    const k = r.scope === 'any' ? anyK : kFor[r.scope];
+    if (k === undefined) {
+      throw new Error(`refusing to publish: rollup scope "${r.scope}" has no threshold`);
+    }
+    if (r.crowd_n != null && r.crowd_n < k) {
+      throw new Error(
+        `refusing to publish: rollup ${r.level}=${r.area} ${r.scope} has ` +
+        `n=${r.crowd_n} below threshold ${k}`);
+    }
+    if (r.suppressed && r.crowd_n != null) {
+      throw new Error('refusing to publish: suppressed rollup carries a count');
+    }
+    // Coarser than the category's own rule is fine and is the point of a
+    // rollup. Finer is a disclosure bug.
+    const rule = r.scope === 'any' ? 'ward' : geoFor[r.scope];
+    if (LEVEL_RANK[r.level] < LEVEL_RANK[rule]) {
+      throw new Error(
+        `refusing to publish: rollup ${r.scope} at level "${r.level}" is finer ` +
+        `than its rule "${rule}"`);
+    }
+  }
+
   const generated_at = new Date().toISOString().slice(0, 10);   // day precision
 
   const files = {
@@ -83,6 +113,15 @@ export async function publish(db, outDir, { seedsDir, demo = false } = {}) {
         s: c.suppressed,
       })),
       geo_levels: geoFor,
+      // Totals over every time band and month, each threshold-checked in its
+      // own right. This is what the map reads by default: the sliced `cells`
+      // are for the day/night breakdown, and slicing is what made 90% of the
+      // map read "insufficient data". `k` is the threshold that applied.
+      rollups: rollups.map(r => ({
+        l: r.level, a: r.area, c: r.scope,
+        n: r.crowd_n, u: r.unreported_n, s: r.suppressed,
+      })),
+      any_threshold: anyK,
     },
     // Street hazards: exact points, no threshold, no victim. Separate file
     // because it is a separate disclosure rule, and mixing them in one payload
