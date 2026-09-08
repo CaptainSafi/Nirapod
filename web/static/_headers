@@ -1,0 +1,17 @@
+# Security headers for Cloudflare Pages and Netlify (both read this file).
+# Vercel ignores it and uses vercel.json instead; the two are kept in step.
+#
+# The Content-Security-Policy is NOT here: SvelteKit emits it as a meta tag with
+# a hash for its own inline script. Setting a second one here would fight it.
+
+/*
+  X-Robots-Tag: noindex, nofollow, noarchive, nosnippet
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
+  Cross-Origin-Opener-Policy: same-origin
+  # The browser itself now refuses a location request from this page, so
+  # "we never ask where you are" is enforced rather than promised.
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), usb=(), interest-cohort=()
+
+/data/*
+  Cache-Control: public, max-age=0, s-maxage=300, stale-while-revalidate=600

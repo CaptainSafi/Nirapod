@@ -1,0 +1,136 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nirapod moderation</title>
+<!--
+  This app is NOT a public surface. In production it is not reachable from the
+  public internet at all: it sits behind Cloudflare Access or a tunnel, not
+  behind a login page on a subdomain. A compromise of the public site must not
+  reach submissions.
+-->
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#0f1113; color:#e9edf1;
+         font:15px/1.5 system-ui,'Noto Sans Bengali',sans-serif; }
+  header { padding:.8rem 1rem; border-bottom:1px solid #2a2f34; background:#171a1d;
+           display:flex; gap:1rem; align-items:center; flex-wrap:wrap; }
+  h1 { font-size:1.05rem; margin:0; }
+  .warn { color:#c9564b; font-size:.85rem; }
+  main { padding:1rem; max-width:1400px; margin:0 auto; }
+  /* The action buttons are the whole point of this screen. Let the table
+     scroll inside its own box rather than pushing them off the viewport. */
+  .scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:.9rem; min-width:900px; }
+  td.act { position:sticky; right:0; background:#0f1113; }
+  th,td { text-align:left; padding:.45rem .5rem; border-bottom:1px solid #2a2f34; }
+  th { color:#98a2ad; font-weight:500; font-size:.8rem; }
+  button { font:inherit; border-radius:6px; border:1px solid #2a2f34; background:none;
+           color:#e9edf1; padding:.3rem .6rem; cursor:pointer; }
+  button.ok { background:#2e7d52; border-color:#2e7d52; }
+  button.no { background:#7d2e2e; border-color:#7d2e2e; }
+  button.hold { background:#7d642e; border-color:#7d642e; }
+  .tabs button.on { background:#d98b3a; color:#16120c; border-color:#d98b3a; }
+  .flag { font-size:.75rem; color:#d98b3a; border:1px solid #d98b3a; border-radius:4px;
+          padding:0 .3rem; margin-right:.25rem; white-space:nowrap; }
+  /* Person-directed reports are about a person, not a place. They should not
+     look like every other row in the queue. */
+  .flag.pd { color:#c9564b; border-color:#c9564b; font-weight:600; }
+  .empty { color:#98a2ad; padding:2rem 0; }
+</style>
+
+<header>
+  <h1>Nirapod moderation queue</h1>
+  <div class="tabs">
+    <button class="on" data-status="pending">pending</button>
+    <button data-status="held">held</button>
+    <button data-status="approved">approved</button>
+    <button data-status="rejected">rejected</button>
+  </div>
+  <button id="publish">publish now</button>
+  <span class="warn">not a public surface: behind Access/tunnel in production</span>
+</header>
+
+<main>
+  <div id="out" class="empty">loading…</div>
+  <h2 style="font-size:.95rem;color:#98a2ad;margin-top:2rem">audit log</h2>
+  <div id="audit" class="empty"></div>
+</main>
+
+<script type="module">
+const token = new URLSearchParams(location.search).get('token') ?? '';
+const q = (u, o) => fetch(u + (u.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token), o);
+let status = 'pending';
+
+const esc = s => String(s ?? '').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+
+// Why this report is in the queue rather than auto-approved. The moderator
+// should see the reason, not just the row — a harassment report and a mugging
+// in a thin cell are queued for completely different reasons and want
+// different attention.
+const PERSON_DIRECTED = new Set(['harassment', 'assault', 'abduction']);
+
+function flags(r) {
+  const f = [];
+  if (PERSON_DIRECTED.has(r.category)) f.push('person-directed');
+  if (r.category === 'police_misconduct') f.push('misconduct');
+  if (r.thana_id) f.push('names a thana');
+  return f.map(x =>
+    `<span class="flag${PERSON_DIRECTED.has(r.category) && x === 'person-directed' ? ' pd' : ''}">${x}</span>`
+  ).join('');
+}
+
+async function load() {
+  const { rows } = await (await q('/api/queue?status=' + status)).json();
+  const out = document.getElementById('out');
+  if (!rows.length) { out.className = 'empty'; out.textContent = 'nothing here.'; return; }
+  out.className = '';
+  out.innerHTML = `<div class="scroll"><table><thead><tr>
+      <th>flags</th><th>category</th><th>ward</th><th>thana</th><th>week</th>
+      <th>time</th><th>police</th><th>reason / outcome</th><th></th></tr></thead>
+    <tbody>${rows.map(r => `<tr>
+      <td>${flags(r)}</td>
+      <td>${esc(r.category)}<br><small style="color:#98a2ad">${esc(r.subcategory)}</small></td>
+      <td>${esc(r.ward_name)}</td>
+      <td>${esc(r.thana_name ?? 'none')}</td>
+      <td>${String(r.occurred_week).slice(0,10)}</td>
+      <td>${esc(r.time_band)}</td>
+      <td>${r.reported_to_police ? 'yes' : 'no'}</td>
+      <td>${esc(r.why_not_reported ?? r.police_outcome ?? 'none')}</td>
+      <td class="act" style="white-space:nowrap">
+        <button class="ok" data-id="${r.id}" data-to="approved">approve</button>
+        <button class="hold" data-id="${r.id}" data-to="held">hold</button>
+        <button class="no" data-id="${r.id}" data-to="rejected">reject</button>
+      </td></tr>`).join('')}</tbody></table></div>`;
+}
+
+async function loadAudit() {
+  const { rows } = await (await q('/api/audit')).json();
+  const el = document.getElementById('audit');
+  if (!rows.length) { el.textContent = 'no decisions yet.'; return; }
+  el.className = '';
+  el.innerHTML = `<div class="scroll"><table><tbody>${rows.map(r => `<tr>
+      <td>${esc(r.moderator)}</td><td>${esc(r.from_status)} → <b>${esc(r.to_status)}</b></td>
+      <td style="color:#98a2ad">${String(r.acted_at).replace('T',' ').slice(0,19)}</td>
+      <td style="color:#98a2ad">${esc(r.report_id ?? '').slice(0,8)}</td>
+    </tr>`).join('')}</tbody></table></div>`;
+}
+
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.status) {
+    status = b.dataset.status;
+    document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+    return load();
+  }
+  if (b.id === 'publish') { await q('/api/publish-now', { method: 'POST' }); b.textContent = 'published'; setTimeout(() => b.textContent = 'publish now', 1500); return; }
+  if (b.dataset.id) {
+    await q('/api/decide', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: b.dataset.id, to: b.dataset.to, moderator: 'demo' }) });
+    await load(); await loadAudit();
+  }
+});
+
+await load(); await loadAudit();
+setInterval(load, 10000);
+</script>

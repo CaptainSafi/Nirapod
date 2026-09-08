@@ -1,0 +1,7 @@
+[out:json][timeout:120];
+area["name:en"="Dhaka District"]["boundary"="administrative"]->.d;
+(
+  relation(area.d)["boundary"="administrative"]["admin_level"="9"];
+  relation(area.d)["boundary"="administrative"]["admin_level"="10"];
+);
+out geom;

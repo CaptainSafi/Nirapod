@@ -1,0 +1,20 @@
+# Nothing listed here is uploaded to the host.
+
+# The moderation app is NOT a public surface. In production it sits behind
+# Cloudflare Access or a tunnel; putting it on Vercel would publish the review
+# queue with a shared token as the only thing in front of it.
+moderation/
+
+# Not needed to build or serve the site.
+db/tests/
+server/test/
+docs/
+*.tgz
+*.md
+
+# NOTE on what is deliberately NOT excluded:
+#   server/ and db/migrations/ and db/seeds/ are required AT BUILD TIME.
+#   `npm run build:review` starts an in-process Postgres, applies the real
+#   migrations to it, loads the ward boundaries, and runs the batch publish to
+#   produce web/build/data. Excluding them breaks the build.
+#   They ship no runtime surface: the deployed output is static files only.

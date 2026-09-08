@@ -1,0 +1,4 @@
+# A review build carries synthetic figures against real ward names.
+# It must never turn up in a search for "Badda crime statistics".
+User-agent: *
+Disallow: /
