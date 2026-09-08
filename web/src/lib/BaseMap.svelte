@@ -20,6 +20,7 @@
     base = '/dhaka.pmtiles',
     admin = '/dhaka_admin.pmtiles',
     workerUrl = '/maplibre-gl-worker.mjs',
+    lang = 'bn',            // which name a label prefers
     level = 'ward',            // ward | thana — which layer is live
     colors = {},               // { [areaId]: cssColour | 'suppressed' }
     hazards = [],              // [{ id, lon, lat, state }]
@@ -28,6 +29,12 @@
     onpick = () => {},
     demo = false,
     demoText = 'DEMO',
+    // The in-map watermark is OFF by default at Safi's request: at city zoom it
+    // sits across the middle of the map and obstructs reading it. Turn it back
+    // on (watermark={demo}) before sharing a link or a screenshot of demo data
+    // with anyone outside the room — the red banner and the DEMO in <title>
+    // survive a link preview, but neither survives a cropped screenshot.
+    watermark = false,
     onunavailable = () => {},
   } = $props();
 
@@ -186,7 +193,7 @@
 
       map.once('load', () => {
         if (!map.hasImage('hatch')) map.addImage('hatch', hatchImage());
-        map.setStyle(style({ base: abs(base), admin: abs(admin) }));
+        map.setStyle(style({ base: abs(base), admin: abs(admin), lang }));
       });
 
       map.on('styledata', () => {
@@ -232,7 +239,7 @@
 
 <div class="map" bind:this={container} role="application"
      aria-label={demo ? 'Dhaka map, demo data' : 'Dhaka map'}>
-  {#if demo}
+  {#if demo && watermark}
     <!-- Inside the map container on purpose: a screenshot of the map is a
          screenshot of the watermark. -->
     <div class="wm" aria-hidden="true">{demoText}</div>

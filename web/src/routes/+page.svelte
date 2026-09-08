@@ -317,6 +317,7 @@
           bind:hovered
           onpick={pick}
           {demo}
+          lang={ui.lang}
           demoText={t.demo_watermark}
           onunavailable={() => (tiled = false)} />
       {:else if (layer === 'hazard' ? wardGeo : shapes) && proj}

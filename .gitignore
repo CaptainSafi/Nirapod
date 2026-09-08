@@ -5,3 +5,6 @@ web/.svelte-kit/
 *.log
 .env
 .DS_Store
+
+# Screenshots the Claude desktop app drops into the repo folder
+Claude outputs/
