@@ -120,15 +120,14 @@ export function style({
       // One pair of layers per geography level; `level` hides the other pair,
       // because a category published at thana level must never be drawable at
       // ward level by toggling a control.
-      // Opacity falls as you zoom in. Far out the choropleth IS the content;
-      // up close the reader is looking for their own street, and a flat 0.7
-      // tint over the whole viewport hides it.
       { id: 'ward-fill', type: 'fill', source: 'admin', 'source-layer': 'wards',
         paint: {
           'fill-color': ['coalesce', ['feature-state', 'color'], 'rgba(0,0,0,0)'],
-          'fill-opacity': ['case',
-            ['boolean', ['feature-state', 'hover'], false], 0.85,
-            ['interpolate', ['linear'], ['zoom'], 10, 0.66, 15, 0.34]],
+          // `zoom` has to be the top-level input to interpolate, so the hover
+          // case lives inside each stop rather than wrapping the whole thing.
+          'fill-opacity': ['interpolate', ['linear'], ['zoom'],
+            10, ['case', ['boolean', ['feature-state', 'hover'], false], 0.85, 0.66],
+            15, ['case', ['boolean', ['feature-state', 'hover'], false], 0.85, 0.34]],
         } },
 
       // Below-threshold areas carry a texture, not a colour: "we are not
@@ -151,9 +150,9 @@ export function style({
       { id: 'thana-fill', type: 'fill', source: 'admin', 'source-layer': 'thanas',
         paint: {
           'fill-color': ['coalesce', ['feature-state', 'color'], 'rgba(0,0,0,0)'],
-          'fill-opacity': ['case',
-            ['boolean', ['feature-state', 'hover'], false], 0.8,
-            ['interpolate', ['linear'], ['zoom'], 9, 0.55, 14, 0.3]],
+          'fill-opacity': ['interpolate', ['linear'], ['zoom'],
+            9,  ['case', ['boolean', ['feature-state', 'hover'], false], 0.8, 0.55],
+            14, ['case', ['boolean', ['feature-state', 'hover'], false], 0.8, 0.30]],
         } },
 
       { id: 'thana-suppressed', type: 'fill', source: 'admin', 'source-layer': 'thanas',

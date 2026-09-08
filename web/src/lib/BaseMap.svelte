@@ -185,7 +185,11 @@
       });
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
       map.on('error', (e) => {
-        if (/pmtiles|Failed to fetch/i.test(String(e?.error ?? ''))) onunavailable();
+        const msg = String(e?.error ?? e);
+        if (/pmtiles|Failed to fetch/i.test(msg)) { onunavailable(); return; }
+        // Anything else is a bug in our own style or data. Swallowing it is how
+        // a blank map with a clean console happens, which is a bad half hour.
+        console.error('[map]', msg);
       });
 
       map.on('styleimagemissing', (e) => {
