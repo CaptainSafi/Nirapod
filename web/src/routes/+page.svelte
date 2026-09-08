@@ -558,7 +558,7 @@
     padding: 0 .3rem; font-size: .7rem; font-style: normal; margin-left: .3rem; }
 
   /* Map and panel side by side on a wide screen; stacked on a phone. */
-  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 19rem; gap: .8rem; align-items: start; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 19rem; gap: .8rem; align-items: stretch; }
   @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
 
   .mapwrap { position: relative; background: var(--panel); border: 1px solid var(--line);
