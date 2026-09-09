@@ -35,10 +35,15 @@
 </ol>
 
 <h2>{bn ? 'জরুরি নম্বর' : 'Emergency numbers'}</h2>
+<!-- tel: links, because most people reading this are on a phone and the point
+     of the number is to be dialled, not read. -->
 <ul class="nums">
-  <li><b>999</b>: {bn ? 'জাতীয় জরুরি সেবা' : 'National emergency'}</li>
-  <li><b>16430</b>: {bn ? 'আইনগত সহায়তা' : 'Legal aid'}</li>
-  <li><b>109</b>: {bn ? 'নারী ও শিশু নির্যাতন প্রতিরোধ' : 'Violence against women and children'}</li>
+  <li><a class="call" href="tel:999"><b>999</b></a>
+      {bn ? 'জাতীয় জরুরি সেবা' : 'National emergency'}</li>
+  <li><a class="call" href="tel:16430"><b>16430</b></a>
+      {bn ? 'আইনগত সহায়তা (বিনামূল্যে)' : 'Legal aid (free)'}</li>
+  <li><a class="call" href="tel:109"><b>109</b></a>
+      {bn ? 'নারী ও শিশু নির্যাতন প্রতিরোধ' : 'Violence against women and children'}</li>
 </ul>
 
 <p class="note">{bn
@@ -49,6 +54,14 @@
   h2 { margin-top: 1.8rem; }
   li { color: #cdd5dd; margin: .35rem 0; }
   a { color: var(--accent); }
+  .nums { list-style: none; padding: 0; }
+  .nums li { display: flex; align-items: baseline; gap: .7rem; margin: .5rem 0; }
+  .call {
+    display: inline-block; text-decoration: none; color: var(--accent);
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: .3rem .9rem; min-width: 5.5rem; text-align: center;
+  }
+  .call:hover { border-color: var(--accent); }
   .nums b { font-size: 1.05rem; }
   .note { color: var(--dim); font-size: .88rem; border-left: 2px solid var(--line); padding-left: .8rem; margin-top: 1.5rem; }
 </style>

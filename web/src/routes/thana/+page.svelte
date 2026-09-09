@@ -56,6 +56,12 @@
     : 'Institutions are named here. People never are. Naming a police station is fair comment on a public body, and that is what keeps this citable.'}
 </p>
 
+<p class="lede dim">
+  {ui.lang === 'bn'
+    ? 'এই সংখ্যাগুলো যারা রিপোর্ট করেছেন তাঁদের অভিজ্ঞতা থেকে: কতজন বলেছেন জিডি নিতে অস্বীকার করা হয়েছে, কতজন বলেছেন কোনো ব্যবস্থা নেওয়া হয়নি। এগুলো পুলিশের নিজস্ব পরিসংখ্যান নয়, এবং যেখানে রিপোর্ট কম সেখানে কিছুই দেখানো হয় না।'
+    : 'These come from what reporters said happened next: how many were refused a GD, and how many saw no action. They are not police statistics, and where reports are few, nothing is shown at all.'}
+</p>
+
 <input class="search" bind:value={query} placeholder={t.search_area} />
 
 <div class="scroll">

@@ -1,9 +1,16 @@
 <script>
   import { ui } from '$lib/state.svelte.js';
+  import { strings } from '$lib/i18n.js';
   const bn = $derived(ui.lang === 'bn');
+  const t = $derived(strings[ui.lang]);
 </script>
 
 <h1>{bn ? 'পদ্ধতি ও তথ্যনীতি' : 'Methodology and data policy'}</h1>
+
+<!-- Two sentences that have to survive being read alone, because a journalist
+     or a sceptic will land here and read exactly this far. -->
+<p class="standfirst">{t.not_authority}</p>
+<p class="standfirst strong">{t.privacy_filter}</p>
 
 <!-- The first thing on the page a reviewer opens, because everything below it
      describes how real data would be handled, and none of the numbers on this
@@ -73,6 +80,9 @@
   : 'Any institution named here can dispute a figure. Disputes and their resolutions are published.'}</p>
 
 <style>
+  .standfirst { color: var(--ink); max-width: 46rem; margin: .2rem 0 .6rem; }
+  .standfirst.strong { font-weight: 700; border-left: 2px solid var(--accent);
+                       padding-left: .8rem; color: var(--ink); }
   h2 { margin-top: 1.8rem; }
   .demo-first { border: 1px solid var(--warn); border-radius: 10px;
     padding: .2rem 1rem 1rem; margin: 1rem 0 2rem; }

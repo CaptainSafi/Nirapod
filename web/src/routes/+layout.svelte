@@ -16,13 +16,15 @@
 
 <header>
   <a class="brand" href="/">{t.site}<span class="tld">.site</span></a>
+  <!-- Reporting is the one action this site needs from a visitor, so it is a
+       button, not the third grey link of five. The rest are references. -->
   <nav>
     <a href="/">{t.nav_map}</a>
-    <a href="/submit/">{t.nav_submit}</a>
-    <a href="/thana/">{t.nav_thana}</a>
-    <a href="/gd/">{t.nav_gd}</a>
+    <a href="/thana/">{t.nav_areas}</a>
+    <a href="/gd/">{t.nav_help}</a>
     <a href="/methodology/">{t.nav_method}</a>
   </nav>
+  <a class="report" href="/submit/">{t.nav_submit}</a>
   <button class="lang" onclick={() => (ui.lang = ui.lang === 'bn' ? 'en' : 'bn')}>
     {ui.lang === 'bn' ? 'English' : 'বাংলা'}
   </button>
@@ -39,12 +41,21 @@
 <main>{@render children()}</main>
 
 <footer>
-  <p>{t.tagline}</p>
+  <!-- Three things belong on every page, not only on the methodology page a
+       visitor will never open: what this is not, what we keep, and the numbers
+       to call when the answer is not a website. -->
+  <p class="disclaim">{t.not_authority}</p>
+  <nav class="flinks">
+    <a href="/methodology/">{t.nav_method}</a>
+    <a href="/gd/">{t.nav_help}</a>
+    <a href="/submit/">{t.nav_submit}</a>
+  </nav>
   <p class="fine">
     {ui.lang === 'bn'
       ? 'আমরা আইপি, লোকেশন বা কোনো ব্যক্তিগত তথ্য সংরক্ষণ করি না। কোনো অ্যাকাউন্ট নেই।'
       : 'We store no IP, no location, and no personal data. There are no accounts.'}
   </p>
+  <p class="emergency">{t.foot_emergency}</p>
 </footer>
 
 <style>
@@ -71,9 +82,21 @@
   nav { display: flex; gap: .9rem; flex-wrap: wrap; font-size: .9rem; }
   nav a { color: var(--dim); text-decoration: none; }
   nav a:hover { color: var(--ink); }
+  .report {
+    margin-left: auto; background: var(--accent); color: #17130a;
+    text-decoration: none; font-weight: 700; font-size: .9rem;
+    border-radius: 999px; padding: .35rem .9rem; white-space: nowrap;
+  }
   .lang {
-    margin-left: auto; background: none; border: 1px solid var(--line);
+    background: none; border: 1px solid var(--line);
     color: var(--ink); border-radius: 999px; padding: .25rem .8rem; cursor: pointer;
+  }
+  /* On a phone the header wraps to two rows; keep the report button on the
+     first one with the brand, where a thumb finds it. */
+  @media (max-width: 560px) {
+    header { gap: .5rem .8rem; }
+    nav { order: 3; width: 100%; gap: .8rem; }
+    .report { margin-left: auto; }
   }
   main { max-width: 1000px; margin: 0 auto; padding: 1rem; }
   footer {
@@ -81,6 +104,11 @@
     color: var(--dim); font-size: .85rem; text-align: center;
   }
   .fine { font-size: .8rem; }
+  .disclaim { max-width: 46rem; margin: 0 auto .8rem; color: var(--dim); }
+  .flinks { display: flex; gap: 1.1rem; justify-content: center; margin-bottom: .8rem; }
+  .flinks a { color: var(--dim); text-decoration: none; }
+  .flinks a:hover { color: var(--ink); }
+  .emergency { color: var(--ink); font-size: .82rem; margin-top: 1rem; opacity: .85; }
   .demo {
     background: var(--warn); color: #140908; text-align: center;
     padding: .45rem 1rem; font-size: .85rem; font-weight: 600;

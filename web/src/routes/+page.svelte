@@ -285,8 +285,18 @@
   function pick(id) { selected = String(selected) === String(id) ? null : id; }
 </script>
 
-<h1>{t.site}<span class="tld">.site</span></h1>
-<p class="sub">{t.tagline}</p>
+<!-- The hero used to open with a percentage. A number is evidence, not an
+     invitation: it tells a visitor what we found, not what they can do. So the
+     first thing on the page is now the situation they are actually in, and the
+     one action the site needs from them. The statistic stays, one screen down,
+     as the reason to believe the rest. -->
+<section class="hero">
+  <h1 class="hook">{t.hook}<br /><span class="hook2">{t.hook_2}</span></h1>
+  <div class="cta-row">
+    <a class="cta big" href="/submit/">{t.hero_cta}</a>
+    <span class="cta-sub">{t.hero_cta_sub}</span>
+  </div>
+</section>
 
 {#if err}<p class="err">could not load data. Is the server running? ({err})</p>{/if}
 
@@ -401,7 +411,6 @@
         {/each}
       </ul>
     {/if}
-    <a class="cta" href="/submit/">{t.report_here}</a>
   </div>
 
   <div class="layout">
@@ -625,6 +634,23 @@
   {/if}
 </p>
 
+<!-- What happens to a report, in three steps, before anyone has to trust us.
+     This is the whole privacy design in the only place most visitors will read
+     it: the page they landed on. -->
+<section class="how">
+  {#each [[t.how_1_t, t.how_1_b], [t.how_2_t, t.how_2_b], [t.how_3_t, t.how_3_b]] as [title, body], i}
+    <div class="step">
+      <div class="stepnum">{num(i + 1, ui.lang)}</div>
+      <div>
+        <div class="stept">{title}</div>
+        <div class="stepb">{body}</div>
+      </div>
+    </div>
+  {/each}
+</section>
+
+<p class="pattern">{t.pattern_line}</p>
+
 <style>
   .tld { color: var(--dim); }
   .sub { color: var(--dim); margin-top: 0; }
@@ -662,6 +688,26 @@
   .unv { color: var(--warn); border: 1px solid var(--warn); border-radius: 4px;
     padding: 0 .3rem; font-size: .7rem; font-style: normal; margin-left: .3rem; }
 
+  .hero { margin: .6rem 0 1.4rem; }
+  .hook { font-size: clamp(1.35rem, 4.2vw, 2.1rem); line-height: 1.25; margin: 0 0 .9rem;
+          max-width: 30ch; }
+  .hook2 { color: var(--dim); font-weight: 600; }
+  .cta-row { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
+  .cta.big { font-size: 1rem; padding: .6rem 1.4rem; }
+  .cta-sub { color: var(--dim); font-size: .86rem; }
+
+  .how { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8rem; margin-bottom: 1.4rem; }
+  @media (max-width: 760px) { .how { grid-template-columns: 1fr; } }
+  .step { display: flex; gap: .7rem; background: var(--panel); border: 1px solid var(--line);
+          border-radius: 12px; padding: .8rem .9rem; }
+  .stepnum { flex: none; width: 1.7rem; height: 1.7rem; border-radius: 999px;
+             display: grid; place-items: center; font-weight: 700; font-size: .85rem;
+             background: var(--line); color: var(--ink); }
+  .stept { font-weight: 700; margin-bottom: .15rem; }
+  .stepb { color: var(--dim); font-size: .86rem; line-height: 1.45; }
+  .pattern { color: var(--dim); font-size: .9rem; border-left: 2px solid var(--accent);
+             padding-left: .8rem; margin: -.4rem 0 1.2rem; max-width: 52rem; }
+
   /* Map and panel side by side on a wide screen; stacked on a phone. */
   .layout { display: grid; grid-template-columns: minmax(0, 1fr) 19rem; gap: .8rem; align-items: stretch; }
   @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
@@ -674,7 +720,7 @@
   .maptools { position: relative; display: flex; gap: .5rem; margin: .1rem 0 .5rem; }
   .maptools .search { flex: 1; min-width: 0; }
   .maptools .hits {
-    position: absolute; top: 100%; left: 0; right: 5.5rem; z-index: 5;
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 5;
     margin: .25rem 0 0; padding: .25rem; list-style: none;
     background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
     box-shadow: 0 8px 24px rgba(0,0,0,.45);
@@ -770,12 +816,22 @@
   @media (max-width: 560px) {
     /* The sticky header already carries the site name; repeating it here costs
        a screen-height of the thing people came for. */
-    h1, .sub { display: none; }
+    /* The old h1 was the site name, already in the header, so it was hidden
+       here. The h1 is now the hook, which is the one thing a phone visitor
+       must read, so only the tagline goes. */
+    .sub { display: none; }
+    .hook { font-size: 1.25rem; margin-bottom: .7rem; }
+    .hero { margin: .2rem 0 1rem; }
     .headline { padding: .7rem .8rem; gap: .7rem; margin-top: .2rem; }
     .big { font-size: 2rem; }
+    /* A horizontal scroller for 13 chips: wrapping them would eat half the
+       screen. The mask fades the right edge so it is visibly scrollable
+       instead of just looking cut off. */
     .cats { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
       -webkit-overflow-scrolling: touch; padding-bottom: .2rem;
-      scroll-snap-type: x proximity; }
+      scroll-snap-type: x proximity;
+      -webkit-mask-image: linear-gradient(to right, #000 88%, transparent 100%);
+      mask-image: linear-gradient(to right, #000 88%, transparent 100%); }
     .cats::-webkit-scrollbar { display: none; }
     .chip { flex: 0 0 auto; scroll-snap-align: start; }
     .divider { flex: 0 0 1px; }
