@@ -6,9 +6,12 @@
 # does nothing; the blobs live in history. This rewrites every commit so they
 # were never there.
 #
-# The tiles are NOT deleted from your working folder. They stay exactly where
-# they are and the site keeps working; they just stop being tracked. See
-# docs/TILES.md for how to rebuild them.
+# THE TILES DO GET REMOVED FROM web\static\. filter-branch checks out the
+# rewritten HEAD when it finishes, and the rewritten HEAD does not contain
+# them, so git deletes them like any other file that left the tree. They are
+# not lost: web\build\ still holds the copies Vite made, and the script copies
+# them back at the end. If you ever run a rewrite by hand, restore them
+# yourself or rebuild per docs/TILES.md.
 #
 # THIS REWRITES HISTORY. Every commit gets a new hash, so the push afterwards
 # must be forced. That is safe here because you are the only person with a
@@ -69,9 +72,23 @@ git gc --prune=now --aggressive
 Write-Host "After:" -ForegroundColor Cyan
 git count-objects -vH | Select-String 'size-pack'
 
+# Put the tiles back. filter-branch checked out a HEAD that does not have them,
+# which deletes them from the working tree; web\build\ is gitignored so its
+# copies survived untouched.
+foreach ($t in 'dhaka.pmtiles', 'dhaka_admin.pmtiles') {
+  if (-not (Test-Path "web\static\$t") -and (Test-Path "web\build\$t")) {
+    Copy-Item "web\build\$t" "web\static\$t"
+    Write-Host "restored web\static\$t from web\build\"
+  }
+}
+
 Write-Host ""
-Write-Host "Tiles still on disk:" -ForegroundColor Cyan
-Get-ChildItem web\static\*.pmtiles | Select-Object Name, Length
+Write-Host "Tiles on disk:" -ForegroundColor Cyan
+Get-ChildItem web\static\*.pmtiles -ErrorAction SilentlyContinue |
+  Select-Object Name, Length
+if (-not (Test-Path 'web\static\dhaka.pmtiles')) {
+  Write-Host "MISSING. Rebuild or copy them: see docs/TILES.md" -ForegroundColor Red
+}
 
 Write-Host ""
 Write-Host "Now force-push (history changed, so this is required):" -ForegroundColor Yellow

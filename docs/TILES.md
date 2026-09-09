@@ -12,6 +12,12 @@ extract and the boundary seeds, and each rebuild is a fresh 50 MB binary. Three
 rebuilds in one day took `.git` to 130 MB, and a blob in git history is there
 forever. `.gitignore` excludes `web/static/*.pmtiles`.
 
+**A history rewrite deletes them from your working tree.** `git filter-branch`
+checks out the rewritten HEAD at the end, and the rewritten HEAD does not track
+them, so they go the way of any other removed file. Copies survive in
+`web/build/` because that directory is gitignored. `scripts/shrink_history.ps1`
+copies them back automatically; a rewrite done by hand will not.
+
 If they are missing the site still works: `BaseMap.svelte` detects the missing
 archives and falls back to the inline SVG choropleth. You get suppression,
 colours and clicking, without streets.
