@@ -2,7 +2,7 @@
 // Value labels for the taxonomy live in labels.js.
 export const strings = {
   bn: {
-    site: 'নিরাপদ', tagline: 'রাস্তা নিরাপদ রাখতে: এলাকাভিত্তিক অপরাধ ও ঝুঁকির রিপোর্ট',
+    site: 'নিরাপদ', tagline: 'আপনার নিরাপত্তা ঝুঁকির সব কিছু, এক জায়গায়',
     nav_map: 'মানচিত্র', nav_submit: 'রিপোর্ট করুন', nav_thana: 'থানা স্কোরকার্ড',
     nav_method: 'পদ্ধতি', nav_gd: 'জিডি কীভাবে করবেন',
     // --- hero, trust strip and footer (added after studying ghush.site) ---
@@ -18,7 +18,7 @@ export const strings = {
     how_2_b: 'প্রকাশের আগে প্রতিটি রিপোর্ট দেখা হয়: কারও নাম বা পরিচয় থাকলে বাদ যায়।',
     how_3_t: 'একসাথে প্রকাশ',
     how_3_b: 'একটি এলাকায় পাঁচটির কম রিপোর্ট থাকলে সংখ্যা দেখানো হয় না। একজনের ঘটনা কখনো আলাদা করে দেখা যায় না।',
-    not_authority: 'নিরাপদ একটি সচেতনতামূলক তালিকা, কোনো সরকারি অভিযোগ কর্তৃপক্ষ নয়। এখানকার রিপোর্ট অযাচাইকৃত। অভিযোগ মানেই প্রমাণিত নয়।',
+    not_authority: '“নিরাপদ” একটি সচেতনতামূলক তালিকা, কোনো সরকারি অভিযোগ কর্তৃপক্ষ নয়। এখানকার রিপোর্ট অযাচাইকৃত। অভিযোগ মানেই প্রমাণিত নয়।',
     privacy_filter: 'আমরা গোপনীয়তার ছাঁকনি, সত্য যাচাইয়ের যন্ত্র নই।',
     pattern_line: 'একটি অভিযোগ উড়িয়ে দেওয়া সহজ। একই এলাকায় চল্লিশটি রিপোর্ট একটি প্যাটার্ন, আর সেটা উড়িয়ে দেওয়া কঠিন।',
     foot_help: 'সাহায্য',
@@ -72,7 +72,7 @@ export const strings = {
     link_copied: 'কপি হয়েছে',
     jump_to: 'এলাকায় যান',
     insufficient: 'পর্যাপ্ত তথ্য নেই', unverified: 'অযাচাইকৃত',
-    crowd: 'জনগণের রিপোর্ট', press: 'সংবাদমাধ্যম-যাচাইকৃত',
+    crowd: 'জনগণের রিপোর্ট', press: 'সংবাদে এসেছে',
     headline_pre: 'রিপোর্টকারীদের মধ্যে', headline_post: 'পুলিশের কাছে যাননি',
     why_top: 'সবচেয়ে বড় কারণ',
     layer_crime: 'অপরাধ', layer_hazard: 'রাস্তার ঝুঁকি',
@@ -90,8 +90,8 @@ export const strings = {
     next: 'পরবর্তী', back: 'পিছনে', submit: 'পাঠান', skip: 'বাদ দিন',
     yes: 'হ্যাঁ', no: 'না', searching: 'ওয়ার্ড খুঁজুন',
     thanks: 'ধন্যবাদ। আপনার রিপোর্ট জমা হয়েছে।',
-    no_receipt: 'কোনো রসিদ নেই, কোনো অ্যাকাউন্ট নেই। পাওয়ার মতো কিছু নেই।',
-    working: 'যাচাই চলছে…',
+    no_receipt: 'কোনো রশিদ বা একাউন্ট নেই। আপনার গোপনীয়তা আমাদের কাছে সুরক্ষিত।',
+    working: 'পাঠানো হচ্ছে…',
     reports_recv: 'প্রাপ্ত রিপোর্ট', gd_refused_share: 'জিডি নিতে অস্বীকার',
     no_action_share: 'কোনো ব্যবস্থা নেই',
     demo_watermark: 'ডেমো ডেটা',
@@ -126,10 +126,10 @@ export const strings = {
     pattern_weapon: 'অস্ত্র', pattern_approach: 'যেভাবে',
     support_title: 'আপনি একা নন',
     support_body: 'জরুরি প্রয়োজনে ৯৯৯। বিনামূল্যে আইনগত সহায়তা ১৬৪৩০। নারী ও শিশু নির্যাতনে ১০৯।',
-    coarse_note: 'ব্যক্তিকেন্দ্রিক ঘটনাগুলো ওয়ার্ড পর্যায়ে দেখানো হয় না। ভুক্তভোগীকে চেনা যেতে পারে বলে থানা বা জেলা পর্যায়ে দেখানো হয়।',
+    coarse_note: 'কোনো ব্যক্তিকেন্দ্রিক ঘটনা বা অপরাধ ওয়ার্ড পর্যায়ে দেখানো হয় না, কারণ এতে ভুক্তভোগীর পরিচয় ফাঁস হতে পারে। থানা বা জেলা পর্যায়ে এটি অন্তর্ভুক্ত।',
   },
   en: {
-    site: 'Nirapod', tagline: 'Keeping streets safe: area-level reports of crime and hazards',
+    site: 'Nirapod', tagline: 'Everything about safety risks in your area, in one place',
     nav_map: 'Map', nav_submit: 'Report', nav_thana: 'Thana scorecards',
     nav_method: 'Methodology', nav_gd: 'How to file a GD',
     // --- hero, trust strip and footer (added after studying ghush.site) ---
@@ -199,7 +199,7 @@ export const strings = {
     link_copied: 'Copied',
     jump_to: 'Go to area',
     insufficient: 'insufficient data', unverified: 'Unverified',
-    crowd: 'Crowd-reported', press: 'Press-verified',
+    crowd: 'Crowd-reported', press: 'Reported in the press',
     headline_pre: 'of people who reported here', headline_post: 'did not go to the police',
     why_top: 'most common reason',
     layer_crime: 'Crime', layer_hazard: 'Street hazards',
@@ -217,8 +217,8 @@ export const strings = {
     next: 'Next', back: 'Back', submit: 'Send', skip: 'Skip',
     yes: 'Yes', no: 'No', searching: 'Search for a ward',
     thanks: 'Thank you. Your report has been submitted.',
-    no_receipt: 'There is no receipt and no account. There is nothing to receive.',
-    working: 'Verifying…',
+    no_receipt: 'There is no receipt and no account. Your privacy is safe with us.',
+    working: 'Sending…',
     reports_recv: 'Reports received', gd_refused_share: 'GD refused',
     no_action_share: 'No action',
     demo_watermark: 'DEMO DATA',
@@ -253,6 +253,6 @@ export const strings = {
     pattern_weapon: 'Weapon', pattern_approach: 'Approach',
     support_title: 'You are not alone',
     support_body: 'Emergency 999. Free legal aid 16430. Violence against women and children 109.',
-    coarse_note: 'Person-directed incidents are not shown at ward level. They are shown at thana or district level, because a rare report in a small ward can identify the person it happened to.',
+    coarse_note: 'No person-directed incident or crime is shown at ward level, because that can expose who it happened to. It is counted at thana or district level instead.',
   },
 };
