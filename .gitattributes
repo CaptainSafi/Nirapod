@@ -1,0 +1,36 @@
+# Line endings.
+#
+# Git on Windows is converting every text file to CRLF on checkout. For most
+# files that is harmless, but not for these: `scripts/*.sh` are run by bash
+# (the Cowork Linux VM, WSL, CI, a deploy host), and bash on a CRLF script
+# fails with "\r: command not found" — a confusing error a long way from its
+# cause. The Python build scripts are run by both platforms too.
+#
+# So: normalise text in the repo to LF, and pin LF in the working tree for
+# everything that an interpreter reads.
+
+* text=auto
+
+*.sh    text eol=lf
+*.py    text eol=lf
+*.js    text eol=lf
+*.mjs   text eol=lf
+*.svelte text eol=lf
+*.sql   text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.html  text eol=lf
+*.css   text eol=lf
+*.geojson text eol=lf
+
+# Windows-only entry points keep CRLF, which cmd.exe wants.
+*.ps1   text eol=crlf
+*.cmd   text eol=crlf
+
+# Binary: never touched, never diffed as text.
+*.pmtiles binary
+*.pbf     binary
+*.png     binary
+*.jpg     binary
+*.woff2   binary
+*.ttf     binary
