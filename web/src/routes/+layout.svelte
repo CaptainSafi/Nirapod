@@ -2,6 +2,7 @@
   import { ui, restoreLang, setLang } from '$lib/state.svelte.js';
   import { page } from '$app/state';
   import { strings } from '$lib/i18n.js';
+  import { num } from '$lib/format.js';
   import { onMount } from 'svelte';
   let { children } = $props();
   const t = $derived(strings[ui.lang]);
@@ -115,9 +116,13 @@
          someone needs it is not the moment to make them copy a number out. -->
     <div class="fcol emergency">
       <h2>{ui.lang === 'bn' ? 'জরুরি নম্বর' : 'Emergency numbers'}</h2>
-      <a href="tel:999"><b>999</b> {ui.lang === 'bn' ? 'জরুরি সেবা' : 'Emergency'}</a>
-      <a href="tel:16430"><b>16430</b> {ui.lang === 'bn' ? 'বিনামূল্যে আইনি সহায়তা' : 'Free legal aid'}</a>
-      <a href="tel:109"><b>109</b> {ui.lang === 'bn' ? 'নারী ও শিশু' : 'Women and children'}</a>
+      <!-- The digits on screen follow the site's rule (format.js): Bangla
+           numerals in Bangla. The tel: href must stay Latin, because that is
+           what the dialler parses. Hardcoding 999 here was breaking a rule the
+           rest of the site already keeps. -->
+      <a href="tel:999"><b>{num(999, ui.lang)}</b> {ui.lang === 'bn' ? 'জরুরি সেবা' : 'Emergency'}</a>
+      <a href="tel:16430"><b>{num(16430, ui.lang)}</b> {ui.lang === 'bn' ? 'বিনামূল্যে আইনি সহায়তা' : 'Free legal aid'}</a>
+      <a href="tel:109"><b>{num(109, ui.lang)}</b> {ui.lang === 'bn' ? 'নারী ও শিশু' : 'Women and children'}</a>
     </div>
   </div>
 
