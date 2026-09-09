@@ -1,16 +1,23 @@
 # Map tiles
 
-The map reads two PMTiles archives from `web/static/`:
+The map is drawn from two PMTiles archives in `web/static/`. **The browser
+never reads those archives.** The build unpacks each one into ordinary
+`{z}/{x}/{y}.pbf` files and the site serves those; see "Why not PMTiles at
+runtime" below. The archives are the source of truth you rebuild and copy
+around, nothing more.
 
 | file | what | size | rebuild when |
 |---|---|---|---|
 | `dhaka.pmtiles` | OSM basemap: water, landuse, roads, buildings, places | ~50 MB | the OSM extract is refreshed |
 | `dhaka_admin.pmtiles` | ward and thana polygons + label points | ~0.7 MB | boundaries or labels change |
 
-**They are not in git.** They are build artifacts: reproducible from the OSM
-extract and the boundary seeds, and each rebuild is a fresh 50 MB binary. Three
-rebuilds in one day took `.git` to 130 MB, and a blob in git history is there
-forever. `.gitignore` excludes `web/static/*.pmtiles`.
+**Two of them are in git, one is not.** `dhaka-z14.pmtiles` (23.8 MiB) and
+`dhaka_admin.pmtiles` are committed, because Cloudflare Pages builds from this
+repo and a tile archive that is not in it means a deployed site with a blank
+map. The full-detail `dhaka.pmtiles` stays out: it is 50 MB, and a blob in git
+history is there forever. Three rebuilds in one day once took `.git` to 130 MB.
+
+Rebuild the full one locally when you want zoom 15; the deploy does not use it.
 
 **A history rewrite deletes them from your working tree.** `git filter-branch`
 checks out the rewritten HEAD at the end, and the rewritten HEAD does not track
@@ -18,9 +25,37 @@ them, so they go the way of any other removed file. Copies survive in
 `web/build/` because that directory is gitignored. `scripts/shrink_history.ps1`
 copies them back automatically; a rewrite done by hand will not.
 
-If they are missing the site still works: `BaseMap.svelte` detects the missing
-archives and falls back to the inline SVG choropleth. You get suppression,
-colours and clicking, without streets.
+If the tiles are missing the site still works: `BaseMap.svelte` fetches
+`/tiles/base/tiles.json`, and when that is not there it falls back to the
+inline SVG choropleth. You get suppression, colours and clicking, without
+streets.
+
+## Why not PMTiles at runtime
+
+PMTiles reads one archive over HTTP range requests, which is a hard dependency
+on the host supporting byte serving. **No Cloudflare static host does.** Both
+Workers static assets and Pages answer a ranged GET with 200, the whole file,
+no `accept-ranges` and no `content-range`, so MapLibre threw
+`content-length exceeding request` and painted nothing. This was measured on
+both hosts, cache-busted and with `cache: 'no-store'` so the browser could not
+answer from its own cache. Do not "fix" it by switching Cloudflare products;
+they share the asset layer.
+
+So `scripts/explode-pmtiles.js` unpacks the archive at build time into
+`web/static/tiles/<name>/{z}/{x}/{y}.pbf` (869 basemap tiles, 470 admin tiles)
+and the style points at those. Any static host on earth can serve them.
+
+Two details that cost an evening each:
+
+- **Tiles are written inflated.** They are gzip inside the archive, and the
+  obvious move is to keep the gzip bytes and set `Content-Encoding` in
+  `_headers`. Cloudflare Pages strips that header. The browser then gets bytes
+  starting `1f 8b` with nothing telling it to inflate them and MapLibre parses
+  none of it, silently. Build output is 58 MB; transfer size is unchanged
+  because Cloudflare compresses on the wire itself.
+- **`minzoom`, `maxzoom` and `bounds` come out of the archive**, via a
+  generated `web/src/lib/tiles-meta.js`. A style claiming a zoom or an extent
+  the pyramid does not have asks for tiles that never existed.
 
 ## Getting them
 
@@ -73,8 +108,9 @@ the browser renders it — panel, search, table, the whole interface.
 
 ## Host file-size limits
 
-`dhaka.pmtiles` at full detail (zoom 15) is **47.8 MB in one file**, and that
-runs into per-file limits:
+Only relevant to the archives themselves, since the deploy ships unpacked
+tiles and the largest single tile is under 1 MB. `dhaka.pmtiles` at full detail
+(zoom 15) is **47.8 MB in one file**, which matters for what you commit:
 
 | host | per-file limit | full basemap? |
 |---|---|---|

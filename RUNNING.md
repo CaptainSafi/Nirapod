@@ -86,7 +86,7 @@ test rubric rather than a hidden shortcut:
 | production | demo | why |
 |---|---|---|
 | Supabase Postgres + PostGIS | PGlite (no PostGIS) | starts with no install. Migrations are applied verbatim except the PostGIS lines; every constraint, grant and suppression rule is identical |
-| MapLibre GL + self-hosted Protomaps tiles | inline SVG choropleth | a basemap needs a tile extract, and no map CDN is acceptable. The SVG has the same suppression behaviour and makes zero third-party requests |
+| MapLibre GL + self-hosted tiles | MapLibre too, or the inline SVG choropleth when the tiles are absent | the tiles are self-built and self-served: no map CDN, zero third-party requests. The demo uses them when `web/static/tiles/` exists, which it does after any build. The SVG fallback has the same suppression behaviour and is what you get in a checkout where the tilers have never run |
 | Cloudflare Access / tunnel | a token on a separate port | the point being demonstrated is that the public server has **no route** to moderation, which holds in both |
 | 30-minute batch | 15-second batch | testability |
 | press records from real journalism, human-reviewed | 60 rows pointing at `example.invalid` | fabricating plausible-looking press records is exactly the failure that ends the project in week one |
