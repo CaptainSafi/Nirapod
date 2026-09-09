@@ -345,6 +345,12 @@
   /* Reading pages get a column; the dashboard gets the screen. */
   main { width: 100%; max-width: 1120px; margin: 0 auto; padding: 1.25rem clamp(1rem, 3vw, 2rem) 3rem; }
   main.bleed { max-width: none; padding: 0; }
+  /* On the bleed page only the dark slab is allowed to touch the edges. Every
+     other section still needs the shell's side padding, or the hero and the
+     cards under the map run into the left edge of the screen. */
+  main.bleed > :global(*:not(.dash)) {
+    padding-inline: clamp(1rem, 4vw, 3.5rem);
+  }
 
   footer { margin-top: 4rem; }
   .fgrid {
