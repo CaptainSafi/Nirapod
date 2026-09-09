@@ -12,14 +12,20 @@
   // resolve relative og:image paths.
   import { ui } from '$lib/state.svelte.js';
   import { strings } from '$lib/i18n.js';
+  import { BUILD_MODE } from '$lib/build-mode.js';
 
   let { title = null, description = null } = $props();
 
   const t = $derived(strings[ui.lang]);
   const site = $derived(`${t.site}.site`);
-  // The DEMO marker rides in the title so it survives a link preview and a
-  // browser tab, which are the two places a screenshot does not reach.
-  const full = $derived(title ? `${title} · ${site} (ডেমো / DEMO)` : `${site} (ডেমো / DEMO)`);
+  // The marker rides in the title so it survives a link preview and a browser
+  // tab, the two places a screenshot warning cannot reach. It has to be baked
+  // at build time, not read from meta.json at runtime, because a scraper never
+  // runs the page.
+  const marker = BUILD_MODE === 'demo' ? ' (ডেমো / DEMO)'
+               : BUILD_MODE === 'beta' ? ' (বেটা / BETA)'
+               : '';
+  const full = $derived(title ? `${title} · ${site}${marker}` : `${site}${marker}`);
   const desc = $derived(description ?? t.meta_default);
   const origin = $derived(typeof location === 'undefined' ? '' : location.origin);
   const url = $derived(typeof location === 'undefined' ? '' : location.origin + location.pathname);

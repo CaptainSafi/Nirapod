@@ -26,6 +26,11 @@ const gen = spawnSync(node, [path.join(ROOT, 'scripts', 'generate-data.js')],
   { stdio: 'inherit', env: { ...process.env, DEMO: '1' } });
 if (gen.status !== 0) process.exit(gen.status ?? 1);
 
+// The demo card carries a red DEMO stripe, so a shared link previews as a demo
+// even when the page around it is cropped away.
+await cp(path.join(ROOT, 'web', 'static', 'og-demo.png'),
+         path.join(ROOT, 'web', 'static', 'og.png'));
+
 console.log('2/3  building the static site…');
 const build = spawnSync(node, [path.join(ROOT, 'scripts', 'build-web.js')], { stdio: 'inherit' });
 if (build.status !== 0) process.exit(build.status ?? 1);

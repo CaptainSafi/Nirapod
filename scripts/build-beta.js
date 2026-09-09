@@ -22,18 +22,23 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const node = process.execPath;
 
+// --light swaps in the zoom-14 basemap (23.8 MiB) so the build fits hosts with
+// a 25 MiB per-file limit, Cloudflare Pages above all. Vector tiles overzoom,
+// so streets and buildings stay sharp; you lose nothing visible.
+const LIGHT = process.argv.includes('--light');
+
 console.log('1/4  generating published data (real, empty)…');
 const gen = spawnSync(node, [path.join(ROOT, 'scripts', 'generate-data.js')],
   { stdio: 'inherit', env: { ...process.env, DEMO: '0', MODE: 'beta' } });
 if (gen.status !== 0) process.exit(gen.status ?? 1);
 
-console.log('2/4  rebuilding the sharing card without the DEMO stripe…');
-const card = spawnSync('python3', [path.join(ROOT, 'scripts', 'build_og_card.py'),
-  '--font', path.join(ROOT, 'web', 'static', 'fonts', 'nirapod-sans.ttf')],
-  { stdio: 'inherit' });
-if (card.status !== 0) {
-  console.warn('     (card not rebuilt: python3 or pillow missing. The old one stays.)');
-}
+console.log('2/4  selecting the sharing card…');
+// Both cards are committed, so deploying needs no python and no pillow. The
+// build just picks one: og-beta.png has no DEMO stripe, og-demo.png does.
+// scripts/build_og_card.py regenerates them when the wording changes.
+await cp(path.join(ROOT, 'web', 'static', 'og-beta.png'),
+         path.join(ROOT, 'web', 'static', 'og.png'));
+console.log('     og-beta.png (no DEMO stripe)');
 
 console.log('3/4  building the static site…');
 // build-web.js uses web/node_modules, which on Windows carries a win32 rollup
@@ -47,6 +52,21 @@ if (build.status !== 0 && process.platform !== 'win32') {
 if (build.status !== 0) process.exit(build.status ?? 1);
 
 console.log('4/4  copying data into the build…');
+if (LIGHT) {
+  const light = path.join(ROOT, 'web', 'static', 'dhaka-z14.pmtiles');
+  try {
+    await access(light);
+    await cp(light, path.join(ROOT, 'web', 'build', 'dhaka.pmtiles'));
+    // static/ holds both archives, so the build got a second 23.8 MiB copy of
+    // the light one under its own name. Nothing references it; drop it.
+    await rm(path.join(ROOT, 'web', 'build', 'dhaka-z14.pmtiles'), { force: true });
+    console.log('     --light: swapped in the zoom-14 basemap (23.8 MiB)');
+  } catch {
+    console.warn('     --light asked for but web/static/dhaka-z14.pmtiles is missing.');
+    console.warn('     Make it with:  pmtiles extract web/static/dhaka.pmtiles \\');
+    console.warn('                      web/static/dhaka-z14.pmtiles --maxzoom=14');
+  }
+}
 const from = path.join(ROOT, 'web', 'data');
 const to = path.join(ROOT, 'web', 'build', 'data');
 await rm(to, { recursive: true, force: true });
@@ -79,6 +99,12 @@ if (oversize.length) {
   console.warn('per file, so does Netlify), or cut the basemap to zoom 14:');
   console.warn('  pmtiles extract web/static/dhaka.pmtiles web/build/dhaka.pmtiles --maxzoom=14');
   console.warn('That is 23.8 MiB and still sharp when overzoomed. See docs/TILES.md.\n');
+}
+
+// Whichever basemap was chosen, only one is referenced. The other must not
+// ride along in the upload.
+if (!LIGHT) {
+  await rm(path.join(ROOT, 'web', 'build', 'dhaka-z14.pmtiles'), { force: true });
 }
 
 for (const f of ['robots.txt', '_headers']) {
