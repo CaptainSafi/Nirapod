@@ -15,13 +15,15 @@
   // they are.
 
   import { style } from '$lib/mapstyle.js';
-  import MapLabels from '$lib/MapLabels.svelte';
 
   let {
     base = '/dhaka.pmtiles',
     admin = '/dhaka_admin.pmtiles',
     workerUrl = '/maplibre-gl-worker.mjs',
-    lang = 'bn',            // which name a label prefers
+    // The map's own labels are English and live in the tiles (see mapstyle.js);
+    // `lang` is kept because the rest of the UI still switches language, and a
+    // future style may want it.
+    lang = 'bn',
     level = 'ward',            // ward | thana — which layer is live
     colors = {},               // { [areaId]: cssColour | 'suppressed' }
     hazards = [],              // [{ id, lon, lat, state }]
@@ -181,6 +183,10 @@
         maxBounds: [[90.05, 23.50], [90.65, 24.10]],
         dragRotate: false,
         pitchWithRotate: false,
+        // Labels cross-fade over 300ms by default, which reads as "the names
+        // arrive late" even though they are drawn in the same frame as the
+        // roads. Short enough to feel immediate, long enough not to flicker.
+        fadeDuration: 80,
         attributionControl: { compact: true },
       });
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
@@ -244,8 +250,6 @@
 
 <div class="map" bind:this={container} role="application"
      aria-label={demo ? 'Dhaka map, demo data' : 'Dhaka map'}>
-  <!-- Place and ward names are HTML, not map glyphs: see MapLabels.svelte. -->
-  <MapLabels {map} {ready} {lang} />
   {#if demo && watermark}
     <!-- Inside the map container on purpose: a screenshot of the map is a
          screenshot of the watermark. -->

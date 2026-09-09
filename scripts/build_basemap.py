@@ -92,12 +92,34 @@ PLACE_MINZOOM = {
 }
 
 def names(tags):
+    """Name properties.
+
+    `name_en` is what the MAP draws. MapLibre renders one glyph per codepoint
+    with no complex-script shaping, so a Bengali label comes out mis-ordered:
+    pre-base vowels stay after their consonant, conjuncts never form, reph is
+    lost. Drawing those labels as HTML instead fixed the shaping but put them on
+    a layer that updates a frame behind the canvas, which reads as lag on every
+    pan. Labels that live in the tiles have neither problem, so the map is
+    labelled in English and the Bangla names stay where the browser can shape
+    them properly: the panel, the search box and the table.
+
+    Measured on this extract: name:en or an ASCII name covers 100% of places
+    and 98% of named roads, so English costs almost no coverage.
+
+    Transliteration was tried and rejected: unidecode turns ঢাকা into
+    "ddhaakaa". A wrong name is worse than no name.
+    """
     out = {}
-    if tags.get('name'):
-        out['name'] = tags['name']
+    n = tags.get('name')
+    if n:
+        out['name'] = n
+        en = tags.get('name:en') or (n if n.isascii() else None)
+        if en:
+            out['name_en'] = en
     if tags.get('name:bn'):
         out['name_bn'] = tags['name:bn']
     return out
+
 
 # ---------------------------------------------------------------- extraction
 
@@ -111,7 +133,14 @@ class Collector(osmium.SimpleHandler):
         self.features = defaultdict(list)   # layer -> [(minzoom, props, geom)]
         self.skipped = 0
 
-    def _add(self, layer, minzoom, props, geom):
+    def _add(self, layer, minzoom, props, geom, fid=None):
+        """`fid` is the OSM id, carried into the tile as the MVT feature id.
+
+        Without it a polygon or line that spans a tile boundary is a different
+        feature in each tile, and MapLibre labels it once per tile: "Ward 98"
+        twice, a few hundred metres apart. With a stable id its cross-tile
+        symbol dedup collapses them into one label.
+        """
         if geom is None or geom.is_empty:
             return
         if not geom.is_valid:
@@ -120,7 +149,7 @@ class Collector(osmium.SimpleHandler):
                 return
         if not self.clip.intersects(geom):
             return
-        self.features[layer].append((minzoom, props, geom))
+        self.features[layer].append((minzoom, props, geom, fid))
 
     def node(self, n):
         t = dict(n.tags)
@@ -132,7 +161,7 @@ class Collector(osmium.SimpleHandler):
         if t.get('population', '').isdigit():
             props['population'] = int(t['population'])
         self._add('places', PLACE_MINZOOM[place], props,
-                  shapely.Point(x, y))
+                  shapely.Point(x, y), n.id)
 
     def way(self, w):
         t = dict(w.tags)
@@ -157,13 +186,13 @@ class Collector(osmium.SimpleHandler):
             if t.get('tunnel') == 'yes':
                 props['tunnel'] = 1
             base = hw[:-5] if hw.endswith('_link') else hw
-            self._add('roads', ROAD_MINZOOM.get(base, 14), props, geom)
+            self._add('roads', ROAD_MINZOOM.get(base, 14), props, geom, w.id)
         else:
             if wat not in ('river', 'stream', 'canal', 'drain', 'ditch'):
                 return
             mz = {'river': 9, 'canal': 12, 'stream': 13,
                   'drain': 14, 'ditch': 15}[wat]
-            self._add('waterway', mz, {'kind': wat, **names(t)}, geom)
+            self._add('waterway', mz, {'kind': wat, **names(t)}, geom, w.id)
 
     def area(self, a):
         t = dict(a.tags)
@@ -176,11 +205,11 @@ class Collector(osmium.SimpleHandler):
         if t.get('natural') == 'water' or t.get('landuse') == 'reservoir' \
                 or t.get('waterway') == 'riverbank' or t.get('natural') == 'wetland':
             kind = t.get('water') or t.get('natural') or 'water'
-            self._add('water', 8, {'kind': kind, **names(t)}, geom)
+            self._add('water', 8, {'kind': kind, **names(t)}, geom, a.orig_id())
             return
         if t.get('building'):
             self._add('buildings', 14,
-                      {'kind': 'building', **names(t)}, geom)
+                      {'kind': 'building', **names(t)}, geom, a.orig_id())
             return
         for key in ('leisure', 'landuse', 'amenity', 'natural', 'aeroway'):
             v = t.get(key)
@@ -188,7 +217,7 @@ class Collector(osmium.SimpleHandler):
                 mz = 10 if LANDUSE_KIND[v] in ('park', 'forest', 'military',
                                                'farmland') else 12
                 self._add('landuse', mz,
-                          {'kind': LANDUSE_KIND[v], **names(t)}, geom)
+                          {'kind': LANDUSE_KIND[v], **names(t)}, geom, a.orig_id())
                 return
 
 def project_line(geom):
@@ -220,7 +249,7 @@ def build(features, out_path, bbox, minzoom, maxzoom, name):
         # intersects candidates that can actually touch it
         by_tile = defaultdict(lambda: defaultdict(list))
         for layer, rows in features.items():
-            for mz, props, geom in rows:
+            for mz, props, geom, fid in rows:
                 if mz > z:
                     continue
                 gminx, gminy, gmaxx, gmaxy = geom.bounds
@@ -230,7 +259,7 @@ def build(features, out_path, bbox, minzoom, maxzoom, name):
                 ty1 = min(y1, int((math.pi * R - gminy) / span))
                 for tx in range(tx0, tx1 + 1):
                     for ty in range(ty0, ty1 + 1):
-                        by_tile[(tx, ty)][layer].append((props, geom))
+                        by_tile[(tx, ty)][layer].append((props, geom, fid))
         for (tx, ty), layers in by_tile.items():
             bminx, bminy, bmaxx, bmaxy = tile_bounds(z, tx, ty)
             pad = span * (64 / EXTENT)
@@ -238,7 +267,7 @@ def build(features, out_path, bbox, minzoom, maxzoom, name):
             enc = []
             for layer, rows in layers.items():
                 feats = []
-                for props, geom in rows:
+                for props, geom, fid in rows:
                     g = geom if clip.contains(geom) else clip.intersection(geom)
                     if g.is_empty:
                         continue
@@ -246,7 +275,10 @@ def build(features, out_path, bbox, minzoom, maxzoom, name):
                         g = g.simplify(tol, preserve_topology=True)
                         if g.is_empty:
                             continue
-                    feats.append({'geometry': g, 'properties': props})
+                    f = {'geometry': g, 'properties': props}
+                    if fid is not None:
+                        f['id'] = int(fid)
+                    feats.append(f)
                 if feats:
                     enc.append({'name': layer, 'features': feats})
             if not enc:
