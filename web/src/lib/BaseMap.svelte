@@ -17,8 +17,8 @@
   import { style } from '$lib/mapstyle.js';
 
   let {
-    base = '/dhaka.pmtiles',
-    admin = '/dhaka_admin.pmtiles',
+    base = '/tiles/base/{z}/{x}/{y}.pbf',
+    admin = '/tiles/admin/{z}/{x}/{y}.pbf',
     workerUrl = '/maplibre-gl-worker.mjs',
     // The map's own labels are English and live in the tiles (see mapstyle.js);
     // `lang` is kept because the rest of the UI still switches language, and a
@@ -148,14 +148,15 @@
   $effect(() => { if (level !== prevLevel) { prevLevel = level; applyLevel(); applyColors(); } });
   $effect(() => { applySelected(prevSelected, selected); prevSelected = selected; });
 
-  async function reachable(url) {
+  // Is the tile pyramid actually there? A checkout where the tilers have not
+  // been run, or a static upload that forgot web/static/tiles, should fall back
+  // to the SVG renderer rather than show a black rectangle. tiles.json is
+  // written next to the pyramid by explode-pmtiles.js and is a few hundred
+  // bytes, so this costs nothing.
+  async function reachable(tileTemplate) {
     try {
-      // A range request, not a full GET: proves the archive is there AND that
-      // the host honours ranges, which is what PMTiles actually needs.
-      const r = await fetch(url, { headers: { Range: 'bytes=0-15' } });
-      // A host that ignores Range answers 200 with the whole archive; cancel
-      // the body rather than downloading 40 MB to answer a yes/no question.
-      r.body?.cancel?.();
+      const url = tileTemplate.replace(/\{z\}.*$/, 'tiles.json');
+      const r = await fetch(url, { method: 'GET' });
       return r.ok;
     } catch { return false; }
   }
@@ -167,11 +168,7 @@
     let cancelled = false;
     (async () => {
       if (!(await reachable(base)) || !(await reachable(admin))) { onunavailable(); return; }
-      // Namespace import: maplibre-gl v5+ exports addProtocol as a named
-      // export, not a property of the default export.
-      const [maplibregl, pmtiles] = await Promise.all([
-        import('maplibre-gl'), import('pmtiles'),
-      ]);
+      const maplibregl = await import('maplibre-gl');
       if (cancelled) return;
       // Without MapLibre's stylesheet the canvas is not absolutely positioned
       // and the container grows to the canvas height instead of holding its
@@ -183,9 +180,6 @@
       // point at a copy we serve ourselves. static/maplibre-gl-worker.mjs is
       // that copy (kept in sync by scripts/vendor_map_worker.sh).
       maplibregl.setWorkerUrl(abs(workerUrl));
-
-      const protocol = new pmtiles.Protocol();
-      maplibregl.addProtocol('pmtiles', protocol.tile);
 
       // Two-phase style load. A fill-pattern layer asks for its image while
       // the style is parsing, which is before any event we can hook, so the
@@ -211,7 +205,7 @@
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
       map.on('error', (e) => {
         const msg = String(e?.error ?? e);
-        if (/pmtiles|Failed to fetch/i.test(msg)) { onunavailable(); return; }
+        if (/Failed to fetch|tiles\/(base|admin)\//i.test(msg)) { onunavailable(); return; }
         // Anything else is a bug in our own style or data. Swallowing it is how
         // a blank map with a clean console happens, which is a bad half hour.
         console.error('[map]', msg);
@@ -223,7 +217,10 @@
 
       map.once('load', () => {
         if (!map.hasImage('hatch')) map.addImage('hatch', hatchImage());
-        map.setStyle(style({ base: abs(base), admin: abs(admin), lang }));
+        // NOT abs(): new URL() percent-encodes the braces, so the template
+        // arrives as %7Bz%7D and MapLibre never substitutes a tile coordinate.
+        // Relative tile URLs resolve against the document on their own.
+        map.setStyle(style({ base, admin, lang }));
       });
 
       map.on('styledata', () => {

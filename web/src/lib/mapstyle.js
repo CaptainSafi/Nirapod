@@ -67,6 +67,8 @@ const LANDUSE_COLOR = [
  * @param {boolean} [o.labels] draw place and road labels
  * @param {'bn'|'en'} [o.lang] which name to prefer on a label
  */
+import { TILES } from './tiles-meta.js';
+
 export function style({
   base, admin,
   glyphs = '/fonts/{fontstack}/{range}.pbf',
@@ -85,10 +87,20 @@ export function style({
     name: 'Nirapod',
     glyphs,
     sources: {
-      base:  { type: 'vector', url: `pmtiles://${base}`,  attribution:
-               '© OpenStreetMap contributors' },
-      admin: { type: 'vector', url: `pmtiles://${admin}`, promoteId: 'id',
-               attribution: 'Boundaries: geoBoundaries (CC-BY 4.0)' },
+      // Plain {z}/{x}/{y}.pbf, not a PMTiles archive. PMTiles reads one file
+      // over HTTP range requests and no Cloudflare static host honours those:
+      // a ranged GET comes back 200 with the whole archive and MapLibre paints
+      // nothing. The archives are still the source of truth in web/static; the
+      // build unpacks them. See scripts/explode-pmtiles.js.
+      //
+      // maxzoom is the deepest zoom that EXISTS, not the deepest the map goes.
+      // Vector tiles overzoom, so z14 tiles keep drawing sharply at z16.
+      base:  { type: 'vector', tiles: [base], attribution:
+               '© OpenStreetMap contributors',
+               minzoom: TILES.base.minzoom, maxzoom: TILES.base.maxzoom },
+      admin: { type: 'vector', tiles: [admin], promoteId: 'id',
+               attribution: 'Boundaries: geoBoundaries (CC-BY 4.0)',
+               minzoom: TILES.admin.minzoom, maxzoom: TILES.admin.maxzoom },
       hazards: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
       // The pin the reporter drops when saying where a hazard is. One point,
       // its own source, so nothing about the reporting flow can be confused

@@ -27,3 +27,8 @@ web/static/*.pmtiles
 
 # Generated at build time from og-demo.png / og-beta.png
 web/static/og.png
+
+# Exploded tile pyramid, written by scripts/explode-pmtiles.js at build time
+# from the .pmtiles archives. Build output, never source.
+web/static/tiles/
+web/src/lib/tiles-meta.js
