@@ -87,18 +87,105 @@
 </footer>
 
 <style>
+  /* Type.
+   *
+   * Two faces, both self-hosted, both OFL-1.1 (licences ship beside the
+   * files). A font CDN would see every visitor of a police-misconduct site,
+   * which is the one thing this project will not allow, so `font-src: 'self'`
+   * in the CSP makes that enforceable rather than promised.
+   *
+   * Hind Siliguri for Bangla: it is what Bangladeshi readers actually see on
+   * the web, so the page reads native rather than translated. Inter for Latin
+   * and for numerals. The unicode-range on Inter is what keeps a Bangla reader
+   * from downloading a Latin face they will barely see, and vice versa.
+   *
+   * Weights are 400/600/700 only. There is no 300 and no 500 on purpose: every
+   * extra weight is another 70 KB over a connection that may be terrible, and
+   * three weights is enough to build a hierarchy with.
+   *
+   * That hierarchy has to come from weight and size, NOT from capitals.
+   * Bangla has no uppercase, so an all-caps display style reads as emphasis in
+   * English and as nothing at all in Bangla. Do not add text-transform here. */
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 400;
+    font-display: swap; src: url('/fonts/ui/inter-latin-400.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F,
+                   U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215;
+  }
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 600;
+    font-display: swap; src: url('/fonts/ui/inter-latin-600.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F,
+                   U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215;
+  }
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 700;
+    font-display: swap; src: url('/fonts/ui/inter-latin-700.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F,
+                   U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215;
+  }
+  /* U+200C/200D are ZWNJ and ZWJ: Bangla conjunct control characters. Leave
+   * them out and a hasant sequence silently falls back to another face
+   * mid-word. U+25CC is the dotted circle a broken cluster renders into, and
+   * it should come from the same font as the vowel sign sitting on it. */
+  @font-face {
+    font-family: 'Hind Siliguri'; font-style: normal; font-weight: 400;
+    font-display: swap; src: url('/fonts/ui/hind-siliguri-bengali-400.woff2') format('woff2');
+    unicode-range: U+0964-0965, U+0980-09FF, U+200C-200D, U+20B9, U+25CC, U+A8F1;
+  }
+  @font-face {
+    font-family: 'Hind Siliguri'; font-style: normal; font-weight: 600;
+    font-display: swap; src: url('/fonts/ui/hind-siliguri-bengali-600.woff2') format('woff2');
+    unicode-range: U+0964-0965, U+0980-09FF, U+200C-200D, U+20B9, U+25CC, U+A8F1;
+  }
+  @font-face {
+    font-family: 'Hind Siliguri'; font-style: normal; font-weight: 700;
+    font-display: swap; src: url('/fonts/ui/hind-siliguri-bengali-700.woff2') format('woff2');
+    unicode-range: U+0964-0965, U+0980-09FF, U+200C-200D, U+20B9, U+25CC, U+A8F1;
+  }
+
   :global(:root) {
     --bg: #0f1113; --panel: #171a1d; --line: #2a2f34;
     --ink: #e9edf1; --dim: #98a2ad; --accent: #d98b3a; --warn: #c9564b;
     color-scheme: dark;
+
+    /* Inter first so Latin and digits take it; Bangla falls through to Hind
+     * Siliguri by unicode-range. The system fallbacks are what a visitor sees
+     * for the ~200 ms before the files land, and Nirmala UI is the one that
+     * ships with Windows. */
+    --font: 'Inter', 'Hind Siliguri', system-ui, 'Nirmala UI',
+            'Noto Sans Bengali', sans-serif;
+
+    /* Hind Siliguri sits small on its em and its line box is tall, so Bangla
+     * set at the same nominal size as Latin looks smaller and more cramped
+     * than it is. Both numbers are corrections for that, not preferences. */
+    --lh: 1.7;
+    --step--1: .875rem;
+    --step-0: 1rem;
+    --step-1: 1.125rem;
+    --step-2: 1.375rem;
+    --step-3: 1.75rem;
+    --step-4: clamp(2rem, 1.4rem + 2.4vw, 3rem);
   }
   :global(*) { box-sizing: border-box; }
   :global(body) {
     margin: 0; background: var(--bg); color: var(--ink);
-    font: 16px/1.55 system-ui, 'Noto Sans Bengali', 'Nirmala UI', sans-serif;
+    font-family: var(--font);
+    font-size: var(--step-0);
+    line-height: var(--lh);
+    /* Hind Siliguri's default figures are fine, but Inter's are slightly
+     * narrow next to Bangla digits. Tabular figures also stop counts in the
+     * panel jittering as they update. */
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
-  :global(h1) { font-size: 1.5rem; margin: 0 0 .4rem; }
-  :global(h2) { font-size: 1.1rem; margin: 1.6rem 0 .5rem; }
+  /* Headings tighten their line box: --lh is set for running Bangla text and
+   * looks loose the moment the type gets big. */
+  :global(h1) { font-size: var(--step-3); line-height: 1.25; font-weight: 700; margin: 0 0 .5rem; letter-spacing: -.01em; }
+  :global(h2) { font-size: var(--step-2); line-height: 1.3; font-weight: 600; margin: 1.8rem 0 .5rem; }
+  :global(h3) { font-size: var(--step-1); line-height: 1.35; font-weight: 600; margin: 1.4rem 0 .4rem; }
+  :global(small), :global(.fine) { font-size: var(--step--1); }
   :global(a) { color: inherit; }
   header {
     display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;

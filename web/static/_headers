@@ -27,3 +27,9 @@
 /tiles/*
   Content-Type: application/x-protobuf
   Cache-Control: public, max-age=3600, s-maxage=604800
+
+# Fonts are content-stable: the file at a given path never changes, a new
+# weight gets a new name. Cache them hard so a returning visitor on a bad
+# connection never pays for them twice.
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
