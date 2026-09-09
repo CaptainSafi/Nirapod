@@ -820,8 +820,6 @@
 <p class="pattern">{t.pattern_line}</p>
 
 <style>
-  .tld { color: var(--dim); }
-  .sub { color: var(--dim); margin-top: 0; }
   .err { color: var(--warn); }
   .small { font-size: .82rem; }
   .headline { display: flex; gap: 1rem; align-items: center; background: var(--panel);
@@ -976,7 +974,7 @@
   .pbig { font-size: 1.9rem; font-weight: 700; margin-top: .35rem; line-height: 1.05;
     font-variant-numeric: tabular-nums; }
   .pbig .unit { font-size: .8rem; font-weight: 400; color: var(--dim); }
-  .pbig.muted, .pbig.zero { font-size: 1.05rem; color: var(--dim); font-weight: 600; }
+  .pbig.muted { font-size: 1.05rem; color: var(--dim); font-weight: 600; }
   .x { background: none; border: 0; color: var(--dim); font-size: 1.3rem; line-height: 1;
     cursor: pointer; padding: 0 .2rem; }
   .x:hover { color: var(--ink); }
@@ -1024,10 +1022,9 @@
   @media (max-width: 560px) {
     /* The sticky header already carries the site name; repeating it here costs
        a screen-height of the thing people came for. */
-    /* The old h1 was the site name, already in the header, so it was hidden
-       here. The h1 is now the hook, which is the one thing a phone visitor
-       must read, so only the tagline goes. */
-    .sub { display: none; }
+    /* The old h1 was the site name, already in the header, and the tagline
+       sat under it; both are gone from this page now. The h1 is the hook,
+       which is the one thing a phone visitor must read. */
     .hook { font-size: 1.25rem; margin-bottom: .7rem; }
     .hero { margin: .2rem 0 1rem; }
     .headline { padding: .7rem .8rem; gap: .7rem; margin-top: .2rem; }
