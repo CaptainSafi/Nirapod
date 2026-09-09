@@ -16,14 +16,14 @@
 /data/*
   Cache-Control: public, max-age=0, s-maxage=300, stale-while-revalidate=600
 
-# Map tiles. They are stored gzip-compressed exactly as they came out of
-# the PMTiles archive, so the browser has to be told to inflate them:
-# MapLibre does not inflate tile bodies itself. If a host ever strips this
-# header, rebuild with `explode-pmtiles.js --inflate` and delete this block.
+# Map tiles. Written as raw protobuf by scripts/explode-pmtiles.js --inflate.
+#
+# They are NOT served gzip-as-stored. Cloudflare Pages strips Content-Encoding
+# out of this file, so the browser got 1f 8b bytes and MapLibre parsed nothing.
+# Cloudflare compresses on the wire on its own, so this costs disk, not bandwidth.
 #
 # The path is stable across rebuilds, so this cannot be immutable: a new
 # basemap would be invisible to anyone holding a cached tile.
 /tiles/*
-  Content-Encoding: gzip
   Content-Type: application/x-protobuf
   Cache-Control: public, max-age=3600, s-maxage=604800

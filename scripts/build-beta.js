@@ -51,7 +51,12 @@ console.log('2/5  unpacking the map tiles…');
       process.exit(1);
     }
     const out = path.join(tilesRoot, name);
-    const r = spawnSync(node, [path.join(ROOT, 'scripts', 'explode-pmtiles.js'), src, out],
+    // --inflate is not optional in practice. Cloudflare Pages strips
+    // Content-Encoding out of _headers, so gzip-as-stored tiles reach the
+    // browser as raw 1f 8b bytes and MapLibre cannot parse them. Measured on a
+    // live deploy. Cloudflare compresses on the wire by itself anyway, so this
+    // costs build size, not transfer size.
+    const r = spawnSync(node, [path.join(ROOT, 'scripts', 'explode-pmtiles.js'), src, out, '--inflate'],
       { stdio: 'inherit' });
     if (r.status !== 0) process.exit(r.status ?? 1);
     const { readFile } = await import('node:fs/promises');

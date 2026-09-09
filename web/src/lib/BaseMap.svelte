@@ -205,12 +205,14 @@
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
       map.on('error', (e) => {
         const msg = String(e?.error ?? e);
-        // A 404 for one tile is NOT a dead map. The extract covers Dhaka, so
+        // A 404 for one tile is NOT a dead map, but ONLY a 404 is ignorable.
+        // Swallowing every message that mentioned a tile URL hid a real parse
+        // failure behind a clean console for an hour. The extract covers Dhaka, so
         // MapLibre asks for tiles outside it at low zoom and gets nothing back;
         // that is expected and the map keeps drawing everything else. Treating
         // it as fatal is how the whole thing collapsed to the SVG fallback.
         // Whether the pyramid exists at all is reachable()'s job, above.
-        if (/tiles\/(base|admin)\/\d+\//i.test(msg)) return;
+        if (e?.error?.status === 404 && /tiles\//.test(msg)) return;
         if (/Failed to fetch/i.test(msg)) { onunavailable(); return; }
         // Anything else is a bug in our own style or data. Swallowing it is how
         // a blank map with a clean console happens, which is a bad half hour.
