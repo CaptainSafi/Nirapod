@@ -71,6 +71,30 @@ reasoning is in the header comments of `scripts/build_basemap.py` and
 HTML instead put them a frame behind the map. Bangla is unaffected everywhere
 the browser renders it — panel, search, table, the whole interface.
 
+## Host file-size limits
+
+`dhaka.pmtiles` at full detail (zoom 15) is **47.8 MB in one file**, and that
+runs into per-file limits:
+
+| host | per-file limit | full basemap? |
+|---|---|---|
+| Cloudflare Pages | 25 MiB | no |
+| GitHub Pages | 100 MB (1 GB site) | yes |
+| Netlify | generous | yes |
+
+To fit Cloudflare, cut the top zoom level. The `pmtiles` CLI does it in under a
+second from the existing archive, no rebuild:
+
+    pmtiles extract web/static/dhaka.pmtiles web/build/dhaka.pmtiles --maxzoom=14
+
+| max zoom | size | what you lose |
+|---|---|---|
+| 15 | 47.8 MB | nothing |
+| **14** | **23.8 MiB** | nothing visible: vector tiles overzoom cleanly, streets and buildings stay sharp |
+| 13 | 3.3 MiB | building footprints and minor roads at close zoom |
+
+`npm run build:beta` warns when any file in the build exceeds 25 MiB.
+
 ## Deploying
 
 `web/build/` gets the tiles because Vite copies `web/static/`. The host must

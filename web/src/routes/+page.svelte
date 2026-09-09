@@ -18,6 +18,9 @@
   let agg = $state(null), press = $state(null), gap = $state(null),
       wards = $state(null), thanas = $state(null), hazards = $state(null),
       methods = $state(null), err = $state(null), demo = $state(false);
+  // 'demo' | 'beta' | 'live'. In beta the map is genuinely empty; saying so
+  // beats letting a tester conclude the site is broken and close the tab.
+  let mode = $state(null);
 
   let layer = $state('crime');       // crime | hazard
   // 'any' is the default because per-category is where the coverage dies: a
@@ -54,6 +57,7 @@
           j('/data/hazards.json'), j('/data/methods.json'),
         ]);
       demo = agg?.demo === true;
+      mode = agg?.mode ?? (demo ? 'demo' : 'live');
       applyHash();   // after data, so a linked area resolves to a name
     } catch (e) { err = String(e); }
   });
@@ -186,6 +190,8 @@
     new Set((agg?.rollups ?? [])
       .filter(r => r.l === level && r.n !== null).map(r => r.a)).size);
   const share = (r) => (r.of ? r.n / r.of : 0);
+
+  const emptyBeta = $derived(mode === 'beta' && totals !== null && totals.crowd === 0);
 
   const totals = $derived.by(() => {
     if (!agg || !press) return null;
@@ -478,6 +484,13 @@
     </tbody>
   </table>
 {:else}
+  {#if emptyBeta}
+    <div class="betanote">
+      <strong>{t.beta_empty_title}</strong>
+      <p>{t.beta_empty_body}</p>
+    </div>
+  {/if}
+
   <div class="maptools">
     <input class="search" bind:value={query} placeholder={t.search_area}
            aria-label={t.search_area} />
@@ -866,6 +879,11 @@
              background: var(--line); color: var(--ink); }
   .stept { font-weight: 700; margin-bottom: .15rem; }
   .stepb { color: var(--dim); font-size: .86rem; line-height: 1.45; }
+  .betanote {
+    background: var(--panel); border: 1px solid var(--accent);
+    border-radius: 12px; padding: .8rem 1rem; margin-bottom: .8rem;
+  }
+  .betanote p { color: var(--dim); font-size: .88rem; margin: .25rem 0 0; }
   .findings { margin: 1.6rem 0 1.2rem; }
   .fscope { color: var(--dim); font-size: .82rem; margin: -.4rem 0 .8rem; }
   .fscope .warn { color: var(--warn); margin-left: .4rem; }

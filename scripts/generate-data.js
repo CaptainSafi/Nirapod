@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DEMO = process.env.DEMO === '1';
+// MODE=beta publishes a real but empty set: nothing seeded, nothing invented.
+const MODE = process.env.MODE || (DEMO ? 'demo' : 'live');
 
 const db = await open();
 if (DEMO) {
@@ -17,7 +19,8 @@ if (DEMO) {
   console.log(`     seeded ${s.reports} reports and ${s.hazards} hazards — all synthetic`);
 }
 const out = await publish(db, path.join(ROOT, 'web', 'data'),
-  { seedsDir: SEEDS, demo: DEMO });
+  { seedsDir: SEEDS, demo: DEMO, mode: MODE });
+console.log(`     mode=${MODE}`);
 console.log(`     published ${out.published} of ${out.cells} cells, ` +
             `${out.hazards} hazards, ${out.methods} method patterns`);
 process.exit(0);

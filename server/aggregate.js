@@ -26,7 +26,13 @@ function day(v) {
   return String(v).slice(0, 10);
 }
 
-export async function publish(db, outDir, { seedsDir, demo = false } = {}) {
+export async function publish(db, outDir, { seedsDir, demo = false, mode = null } = {}) {
+  // 'demo'  synthetic figures against real ward names
+  // 'beta'  real, empty: the write path is not connected yet
+  // 'live'  real reports
+  // The banner, the page title and the social card all key off this, because a
+  // visitor cannot tell an empty map from a broken one without being told.
+  const runMode = mode ?? (demo ? 'demo' : 'live');
   await mkdir(outDir, { recursive: true });
 
   const cells = (await db.query(`SELECT * FROM public_cells()`)).rows;
@@ -113,6 +119,7 @@ export async function publish(db, outDir, { seedsDir, demo = false } = {}) {
     'aggregate.json': {
       generated_at,
       demo,
+      mode: runMode,
       thresholds: kFor,
       // crowd_n is null wherever the cell is suppressed. The client renders
       // "insufficient data" for null. It never receives the real number.
@@ -180,6 +187,7 @@ export async function publish(db, outDir, { seedsDir, demo = false } = {}) {
     'meta.json': {
       generated_at,
       demo,
+      mode: runMode,
       thresholds: kFor,
       note: 'Counts below the threshold for their category are published as null and shown as "insufficient data", never as zero.',
     },

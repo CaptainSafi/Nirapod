@@ -9,6 +9,7 @@
     "build": "node scripts/build-web.js",
     "test": "npm --prefix server test",
     "setup": "npm --prefix server install && npm --prefix web install",
-    "build:review": "node scripts/build-review.js"
+    "build:review": "node scripts/build-review.js",
+    "build:beta": "node scripts/build-beta.js"
   }
 }

@@ -26,6 +26,7 @@
   // path at all. Rather than shipping a form that fails with a network error,
   // detect it once and say plainly that this is a preview.
   let reviewMode = $state(false);
+  let mode = $state(null);
   let wards = $state([]), thanas = $state([]), wardGeo = $state(null), q = $state('');
 
   let f = $state({
@@ -49,6 +50,8 @@
       const r = await fetch('/api/pow', { cache: 'no-store' });
       reviewMode = !r.ok;
     } catch { reviewMode = true; }
+    try { mode = (await (await fetch('/data/meta.json')).json()).mode ?? null; }
+    catch { /* meta is optional */ }
   });
 
   const matches = $derived(
@@ -185,7 +188,12 @@
   <h1>{t.what_report}</h1>
   <!-- Detected on load, so say it on the screen a reviewer actually starts on.
        It used to appear only at step 5, after six screens of answering. -->
-  {#if reviewMode}<p class="reviewnote">{t.review_notice_early}</p>{/if}
+  {#if reviewMode}
+    <p class="reviewnote">
+      {mode === 'beta' ? t.beta_no_submit : t.review_notice_early}
+      {#if mode === 'beta'}<br /><span class="dim">{t.beta_feedback}</span>{/if}
+    </p>
+  {/if}
   <div class="kinds">
     <button class="kind" onclick={() => { kind = 'incident'; step = 0; }}>
       <strong>{t.kind_incident}</strong><span>{t.kind_incident_sub}</span></button>
