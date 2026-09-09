@@ -128,12 +128,21 @@ const metadata = header.metaLength
 
 let written = 0;
 const zooms = new Set();
+// Track the tile extent so the style can carry real bounds. Without them
+// MapLibre asks for every tile in the viewport, most of which were never in
+// the Dhaka extract, and the console fills with 404s for tiles that were never
+// supposed to exist.
+const extent = new Map(); // z -> {minX,maxX,minY,maxY}
 function emit(entry) {
   // A run of length r means r consecutive tile ids share one blob — identical
   // tiles, usually empty ocean. Every id in the run needs its own file.
   for (let k = 0; k < Math.max(1, entry.runLength); k++) {
     const [z, x, y] = tileIdToZxy(entry.tileId + k);
     zooms.add(z);
+    const e = extent.get(z) ?? { minX: x, maxX: x, minY: y, maxY: y };
+    e.minX = Math.min(e.minX, x); e.maxX = Math.max(e.maxX, x);
+    e.minY = Math.min(e.minY, y); e.maxY = Math.max(e.maxY, y);
+    extent.set(z, e);
     const dir = path.join(outDir, String(z), String(x));
     mkdirSync(dir, { recursive: true });
     let blob = read(header.dataOffset + entry.offset, entry.length);
@@ -161,6 +170,20 @@ for (const e of root) {
 closeSync(fd);
 
 const zoomList = [...zooms].sort((a, b) => a - b);
+
+// Tile extent at the deepest zoom -> a lon/lat bounding box. Slippy-map y runs
+// north to south, so maxY gives the SOUTH edge.
+function tileBounds(z, e) {
+  const n = 2 ** z;
+  const lon = (x) => x / n * 360 - 180;
+  const lat = (y) => {
+    const r = Math.PI - 2 * Math.PI * y / n;
+    return 180 / Math.PI * Math.atan(0.5 * (Math.exp(r) - Math.exp(-r)));
+  };
+  return [lon(e.minX), lat(e.maxY + 1), lon(e.maxX + 1), lat(e.minY)];
+}
+const deepest = zoomList[zoomList.length - 1];
+const bounds = tileBounds(deepest, extent.get(deepest));
 console.log(`     ${path.basename(archive)} -> ${outDir}`);
 console.log(`     ${written} tiles, zoom ${zoomList[0]}-${zoomList[zoomList.length - 1]}` +
             `${INFLATE ? ', inflated' : ', gzip as stored'}`);
@@ -172,6 +195,6 @@ writeFileSync(path.join(outDir, 'tiles.json'), JSON.stringify({
   tiles: [],
   minzoom: header.minZoom,
   maxzoom: header.maxZoom,
-  bounds: metadata.bounds ?? undefined,
+  bounds: metadata.bounds ?? bounds.map((v) => Number(v.toFixed(6))),
   vector_layers: metadata.vector_layers ?? undefined,
 }, null, 2) + '\n');

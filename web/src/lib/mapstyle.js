@@ -97,10 +97,15 @@ export function style({
       // Vector tiles overzoom, so z14 tiles keep drawing sharply at z16.
       base:  { type: 'vector', tiles: [base], attribution:
                '© OpenStreetMap contributors',
-               minzoom: TILES.base.minzoom, maxzoom: TILES.base.maxzoom },
+               minzoom: TILES.base.minzoom, maxzoom: TILES.base.maxzoom,
+               // Real extent of the pyramid, computed from the tiles that exist.
+               // Without it MapLibre requests tiles outside the Dhaka extract
+               // and the console fills with 404s for tiles that never existed.
+               bounds: TILES.base.bounds },
       admin: { type: 'vector', tiles: [admin], promoteId: 'id',
                attribution: 'Boundaries: geoBoundaries (CC-BY 4.0)',
-               minzoom: TILES.admin.minzoom, maxzoom: TILES.admin.maxzoom },
+               minzoom: TILES.admin.minzoom, maxzoom: TILES.admin.maxzoom,
+               bounds: TILES.admin.bounds },
       hazards: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
       // The pin the reporter drops when saying where a hazard is. One point,
       // its own source, so nothing about the reporting flow can be confused
