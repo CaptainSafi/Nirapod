@@ -88,6 +88,13 @@ console.log('2/5  unpacking the map tiles…');
     }, null, 2)};\n`);
 }
 
+// The gazetteer is derived from the tiles, so it is rebuilt whenever they are
+// and can never drift from them. Cheap: it reads 869 tiles in about a second.
+{
+  const r = spawnSync(node, [path.join(ROOT, 'scripts', 'build_gazetteer.js')], { stdio: 'inherit' });
+  if (r.status !== 0) process.exit(r.status ?? 1);
+}
+
 console.log('3/5  selecting the sharing card…');
 // Both cards are committed, so deploying needs no python and no pillow. The
 // build just picks one: og-beta.png has no DEMO stripe, og-demo.png does.

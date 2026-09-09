@@ -4,6 +4,7 @@
   // back-navigation state to recover. Closing the tab loses the report, which
   // is correct — the alternative is a server-side record of a half-finished one.
   import { onMount } from 'svelte';
+  import { loadPlaces, searchPlaces, placeLabel, placeWhere } from '$lib/places.js';
   import { ui } from '$lib/state.svelte.js';
   import PageHead from '$lib/PageHead.svelte';
   import { strings } from '$lib/i18n.js';
@@ -28,6 +29,8 @@
   let reviewMode = $state(false);
   let mode = $state(null);
   let wards = $state([]), thanas = $state([]), wardGeo = $state(null), q = $state('');
+  // The gazetteer: place and road names, each already stamped with its ward.
+  let places = $state([]);
 
   let f = $state({
     category: null, subcategory: null, ward_id: null, thana_id: null,
@@ -45,6 +48,9 @@
     const [w, th] = await Promise.all([
       j('/data/wards.json'), j('/data/thanas.json')]);
     wards = w.wards; thanas = th.thanas;
+    // Fetched after the ward lists because the form is usable without it and
+    // it is the biggest file on this page.
+    loadPlaces().then((rows) => (places = rows));
 
     try {
       const r = await fetch('/api/pow', { cache: 'no-store' });
@@ -54,10 +60,27 @@
     catch { /* meta is optional */ }
   });
 
+  // Two kinds of result in one list. A place or road resolves to the ward it
+  // sits in, which is what actually gets stored; a ward can still be picked by
+  // name for anyone who does think that way. Places come first because "where
+  // did it happen" is answered with a place name, not an administrative unit.
+  const placeHits = $derived(searchPlaces(places, q, 8));
+  const wardById = $derived(new Map(wards.map((w) => [String(w.id), w])));
   const matches = $derived(
     q.trim().length < 1 ? wards.slice(0, 40)
       : wards.filter(w => (w.name_en + ' ' + (w.name_bn ?? '') + ' ' + (w.upazila ?? ''))
-          .toLowerCase().includes(q.toLowerCase())).slice(0, 60));
+          .toLowerCase().includes(q.toLowerCase())).slice(0, 20));
+
+  // Picking a place is picking its ward. The place name itself is never stored:
+  // it is a way of finding the ward, not a finer-grained location.
+  function choosePlace(p) {
+    const w = wardById.get(String(p.w));
+    if (!w) return;
+    f.ward_id = w.id; f.thana_id = w.thana_id;
+    hz.ward_id = w.id;
+    chosenPlace = p;
+  }
+  let chosenPlace = $state(null);
   const wardLabel = (w) => ui.lang === 'bn'
     ? (w.name_bn ? `${w.name_bn} · ${w.upazila}` : w.name_en) : w.name_en;
 
@@ -290,15 +313,28 @@
       <!-- Searchable ward list. There is no "use my location" button, and the
            page never asks the browser for GPS: an exact coordinate is the one
            thing that cannot be un-learned once collected. -->
-      <input class="search" bind:value={q} placeholder={t.searching} />
+      <input class="search" bind:value={q} placeholder={t.search_place} />
       <div class="list">
-        {#each matches as w}
-          <button class="row" class:on={f.ward_id === w.id}
-            onclick={() => { f.ward_id = w.id; f.thana_id = w.thana_id; }}>
-            {wardLabel(w)}<span class="dim"> · {w.upazila}</span>
+        {#each placeHits as p}
+          <button class="row place" class:on={chosenPlace === p} onclick={() => choosePlace(p)}>
+            <span class="pname">{placeLabel(p, ui.lang)}</span>
+            <span class="dim">{placeWhere(p, ui.lang)}</span>
           </button>
         {/each}
+        {#if placeHits.length && matches.length}<div class="sep"></div>{/if}
+        {#each matches as w}
+          <button class="row" class:on={f.ward_id === w.id && !chosenPlace}
+            onclick={() => { f.ward_id = w.id; f.thana_id = w.thana_id; chosenPlace = null; }}>
+            <span class="pname">{wardLabel(w)}</span><span class="dim">{w.upazila}</span>
+          </button>
+        {/each}
+        {#if q.trim().length >= 2 && !placeHits.length && !matches.length}
+          <p class="dim empty">{t.no_match}</p>
+        {/if}
       </div>
+      <!-- Said once, here, because this is the screen where someone is deciding
+           how much to give away. -->
+      <p class="dim ward_note">{t.place_to_ward}</p>
 
     {:else if step === 2}
       <div class="grid">
@@ -437,6 +473,13 @@
     padding: .5rem .6rem; border-radius: 6px; cursor: pointer; font: inherit; }
   .row:hover { border-color: var(--line); }
   .row.on { background: var(--accent); color: var(--on-accent); }
+  .row { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
+  .pname { font-weight: 500; }
+  .row .dim { font-size: .85rem; }
+  .row.on .dim { color: inherit; opacity: .8; }
+  .sep { height: 1px; background: var(--line); margin: .4rem 0; }
+  .empty { padding: .6rem .2rem; }
+  .ward_note { margin-top: .7rem; font-size: .85rem; }
   .pickwrap { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
   .pickmap { width: 100%; height: auto; background: var(--field); border-radius: 8px;
     border: 1px solid var(--line); cursor: crosshair; }

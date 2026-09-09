@@ -1,5 +1,5 @@
 <script>
-  import { ui, restoreLang, setLang } from '$lib/state.svelte.js';
+  import { ui, restoreLang, setLang, restoreTheme, setTheme, nextTheme } from '$lib/state.svelte.js';
   import { page } from '$app/state';
   import { strings } from '$lib/i18n.js';
   import { num } from '$lib/format.js';
@@ -31,6 +31,7 @@
   const demo = $derived(mode === 'demo');
   onMount(async () => {
     restoreLang();
+    restoreTheme();
     try {
       const m = await (await fetch('/data/meta.json')).json();
       mode = m.mode ?? (m.demo ? 'demo' : 'live');
@@ -42,6 +43,15 @@
   // translation tools were told the wrong thing.
   $effect(() => {
     if (typeof document !== 'undefined') document.documentElement.lang = ui.lang;
+  });
+
+  // 'system' stamps nothing and lets the media query decide, which is why the
+  // attribute is removed rather than set to a third value.
+  $effect(() => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    if (ui.theme === 'system') root.removeAttribute('data-theme');
+    else root.setAttribute('data-theme', ui.theme);
   });
 </script>
 
@@ -61,6 +71,20 @@
       <a href="/methodology/" aria-current={page.url?.pathname?.startsWith('/methodology') ? 'page' : undefined}>{t.nav_method}</a>
     </nav>
     <div class="actions">
+      <!-- Icon-only, because the label for a theme toggle is longer than the
+           control in both languages and the icon is understood everywhere.
+           aria-label carries the meaning for anyone who cannot see it. -->
+      <button class="icon" onclick={() => setTheme(nextTheme())}
+        aria-label={ui.lang === 'bn' ? 'আলো বা অন্ধকার' : 'Light or dark'}
+        title={ui.lang === 'bn' ? 'আলো বা অন্ধকার' : 'Light or dark'}>
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
+          <path class="sun" d="M12 4V2M12 22v-2M4 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M18.4 5.6l1.4-1.4M4.2 19.8l1.4-1.4"
+                fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <circle class="sun" cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/>
+          <path class="moon" d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"
+                fill="currentColor"/>
+        </svg>
+      </button>
       <button class="lang" onclick={() => setLang(ui.lang === 'bn' ? 'en' : 'bn')}>
         {ui.lang === 'bn' ? 'English' : 'বাংলা'}
       </button>
@@ -249,29 +273,59 @@
     --step-3: 1.75rem;
     --step-4: clamp(2rem, 1.4rem + 2.4vw, 3rem);
   }
-  /* The dark surface. Same token names, dark values, so a component written
-   * for one works in the other. --accent lifts to #e09a4e because #a1520f on
-   * a dark panel is 2.1:1 and unreadable. */
-  :global(.on-dark) {
-    --bg: #0f1113;
-    --surface: #171a1d;
-    --panel: #171a1d;
-    --line: #2a2f34;
+  /* The dark surface, in one place, applied by three different selectors.
+   *
+   *   [data-theme='dark']   the visitor chose dark
+   *   .on-dark              a slab that is dark even on a light page (the map)
+   *   the media query       no choice made, and the OS says dark
+   *
+   * The mapping is written twice because a media query cannot join a selector
+   * list. If you change a value, change it in both.
+   *
+   * These are darker than the first pass: #08090b rather than #0f1113. On an
+   * OLED phone at night, which is most of this audience, the old grey read as
+   * washed out next to the black the phone can actually produce. */
+  :global(:root[data-theme='dark']), :global(.on-dark) {
+    --bg: #08090b;
+    --surface: #101216;
+    --panel: #101216;
+    --line: #23262c;
     --line-strong: #626c76;
     --ink: #e9edf1;
     --dim: #98a2ad;
     --accent: #e09a4e;
     --on-accent: #17130a;
     --warn: #ea8a80;
-    --field: #101315;
+    --field: #0d0f12;
     --accent-tint: #2a2216;
-    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.45);
     --raise: rgba(255,255,255,.05);
     --raise-2: rgba(255,255,255,.09);
     color-scheme: dark;
-    background: var(--bg);
-    color: var(--ink);
   }
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme='light'])) {
+      --bg: #08090b;
+      --surface: #101216;
+      --panel: #101216;
+      --line: #23262c;
+      --line-strong: #626c76;
+      --ink: #e9edf1;
+      --dim: #98a2ad;
+      --accent: #e09a4e;
+      --on-accent: #17130a;
+      --warn: #ea8a80;
+      --field: #0d0f12;
+      --accent-tint: #2a2216;
+      --shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.45);
+      --raise: rgba(255,255,255,.05);
+      --raise-2: rgba(255,255,255,.09);
+      color-scheme: dark;
+    }
+  }
+  /* .on-dark paints itself; the root must not, or the page would be a dark
+     rectangle sitting on a light one during load. */
+  :global(.on-dark) { background: var(--bg); color: var(--ink); }
 
   :global(*) { box-sizing: border-box; }
   :global(body) {
@@ -334,6 +388,25 @@
   }
   .report:hover { filter: brightness(1.08); }
   .report.ghost { background: none; color: var(--ink); border: 1px solid var(--line-strong); }
+  .icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2.1rem; height: 2.1rem; padding: 0;
+    background: none; border: 1px solid var(--line-strong); color: var(--dim);
+    border-radius: 999px; cursor: pointer;
+  }
+  .icon:hover { color: var(--ink); border-color: var(--dim); }
+  /* One SVG, two states. The sun shows on a dark page, because tapping it is
+     what takes you to light; the moon shows on a light one. Both the explicit
+     choice and the OS default have to be handled, or the icon contradicts the
+     page for anyone who never touched the toggle. */
+  .icon .sun { display: none; }
+  .icon .moon { display: inline; }
+  :global(:root[data-theme='dark']) .icon .sun { display: inline; }
+  :global(:root[data-theme='dark']) .icon .moon { display: none; }
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme='light'])) .icon .sun { display: inline; }
+    :global(:root:not([data-theme='light'])) .icon .moon { display: none; }
+  }
   .lang {
     background: none; border: 1px solid var(--line-strong); color: var(--dim);
     border-radius: 999px; padding: .4rem .85rem; cursor: pointer;

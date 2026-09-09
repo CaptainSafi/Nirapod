@@ -32,3 +32,6 @@ web/static/og.png
 # from the .pmtiles archives. Build output, never source.
 web/static/tiles/
 web/src/lib/tiles-meta.js
+
+# Gazetteer, generated from the tiles by scripts/build_gazetteer.js
+web/static/geo/
