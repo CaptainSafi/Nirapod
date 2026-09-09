@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { ui } from '$lib/state.svelte.js';
+  import PageHead from '$lib/PageHead.svelte';
   import { strings } from '$lib/i18n.js';
   import { num, pct } from '$lib/format.js';
   const t = $derived(strings[ui.lang]);
@@ -16,6 +17,13 @@
     name: ui.lang === 'bn' ? (th.name_bn ?? th.name_en) : th.name_en,
     sc: th.scorecard && !th.scorecard.suppressed ? th.scorecard : null,
   })));
+
+  // 33 of 46 rows said "insufficient data", which reads as a broken page. The
+  // threshold is not the problem — it is deliberately higher here, because an
+  // accusation against a named public body needs a higher bar than area risk.
+  // So the page stops presenting 33 empty rows as if they were data, and says
+  // what is actually true: these thanas have not reached ten reports yet.
+  let showWaiting = $state(false);
 
   const rows = $derived.by(() => {
     const q = query.trim().toLowerCase();
@@ -34,6 +42,8 @@
     });
     return list;
   });
+  const published = $derived(rows.filter(r => r.sc));
+  const waiting = $derived(rows.filter(r => !r.sc));
 
   function by(key) {
     sort = sort.key === key
@@ -49,7 +59,9 @@
                                            Number(r.sc.no_action_rate ?? 0)])));
 </script>
 
-<h1>{t.nav_thana}</h1>
+<PageHead title={t.nav_areas} description={t.meta_thana} />
+
+<h1>{t.nav_areas}</h1>
 <p class="lede">
   {ui.lang === 'bn'
     ? 'এখানে প্রতিষ্ঠানের নাম প্রকাশ করা হয়, কোনো ব্যক্তির নাম নয়। একটি থানার নাম উল্লেখ করা একটি সরকারি প্রতিষ্ঠান নিয়ে ন্যায্য মন্তব্য।'
@@ -62,7 +74,11 @@
     : 'These come from what reporters said happened next: how many were refused a GD, and how many saw no action. They are not police statistics, and where reports are few, nothing is shown at all.'}
 </p>
 
+<p class="lede dim">{t.sc_what}</p>
+
 <input class="search" bind:value={query} placeholder={t.search_area} />
+
+<h2 class="sect">{t.sc_published}</h2>
 
 <div class="scroll">
   <table>
@@ -75,7 +91,7 @@
       </tr>
     </thead>
     <tbody>
-      {#each rows as r (r.id)}
+      {#each published as r (r.id)}
         <tr>
           <td>{r.name}</td>
           {#if r.sc}
@@ -88,8 +104,6 @@
               <span class="fill" style="width:calc({(Number(r.sc.no_action_rate) / maxRate) * 100}% - 3rem)"></span>
               <span class="v">{pct(r.sc.no_action_rate, ui.lang)}</span>
             </td>
-          {:else}
-            <td class="dim" colspan="3">{t.insufficient}</td>
           {/if}
         </tr>
       {:else}
@@ -98,6 +112,19 @@
     </tbody>
   </table>
 </div>
+
+{#if waiting.length}
+  <div class="waiting">
+    <button class="wtoggle" onclick={() => (showWaiting = !showWaiting)}
+            aria-expanded={showWaiting}>
+      {t.sc_waiting} · {showWaiting ? t.sc_hide : t.sc_show}
+    </button>
+    <p class="dim small">{t.sc_waiting_n.replace('{n}', num(waiting.length, ui.lang))}</p>
+    {#if showWaiting}
+      <p class="names">{waiting.map(r => r.name).join(' · ')}</p>
+    {/if}
+  </div>
+{/if}
 
 <p class="note">
   {ui.lang === 'bn'
@@ -112,6 +139,14 @@
 
 <style>
   .lede { color: var(--dim); }
+  .sect { font-size: .95rem; margin: 1.2rem 0 .4rem; }
+  .waiting { margin-top: 1.2rem; border-top: 1px solid var(--line); padding-top: .9rem; }
+  .wtoggle { background: none; border: 1px solid var(--line); color: var(--ink);
+    border-radius: 999px; padding: .3rem .9rem; font: inherit; font-size: .85rem;
+    cursor: pointer; }
+  .wtoggle:hover { border-color: var(--dim); }
+  .small { font-size: .82rem; }
+  .names { color: var(--dim); font-size: .85rem; line-height: 1.7; }
   .search { width: 100%; padding: .55rem .8rem; border-radius: 8px; border: 1px solid var(--line);
     background: #101315; color: var(--ink); font: inherit; margin-bottom: .7rem; }
   .scroll { overflow-x: auto; }

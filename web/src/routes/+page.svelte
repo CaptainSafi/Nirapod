@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { ui } from '$lib/state.svelte.js';
+  import PageHead from '$lib/PageHead.svelte';
   import { strings } from '$lib/i18n.js';
   import { labels } from '$lib/labels.js';
   import { CATEGORIES, HAZARDS, areaCrime, personDirected } from '$lib/taxonomy.js';
@@ -41,9 +42,13 @@
   onMount(async () => {
     try {
       const j = async (u) => (await fetch(u)).json();
-      [wardGeo, thanaGeo, agg, press, gap, wards, thanas, hazards, methods] =
+      // Ward and thana GeoJSON are NOT fetched here any more. They were 337 KB
+      // on every visit, and the map has read its boundaries from the vector
+      // tiles since the tiles existed. They are now loaded only if the SVG
+      // fallback actually has to draw (see loadShapes below), which is the
+      // no-tiles case and nothing else.
+      [agg, press, gap, wards, thanas, hazards, methods] =
         await Promise.all([
-          j('/data/dhaka_wards.geojson'), j('/data/dhaka_thanas.geojson'),
           j('/data/aggregate.json'), j('/data/press.json'), j('/data/gap.json'),
           j('/data/wards.json'), j('/data/thanas.json'),
           j('/data/hazards.json'), j('/data/methods.json'),
@@ -62,6 +67,17 @@
   // Never finer than the category's rule; otherwise honour the reader.
   const level = $derived(RANK[geo] > RANK[ruleLevel] ? geo : ruleLevel);
   const shapes = $derived(level === 'ward' ? wardGeo : level === 'thana' ? thanaGeo : null);
+
+  /** Fetch the polygons, once, only when the SVG renderer needs to draw. */
+  let loadingShapes = false;
+  async function loadShapes() {
+    if (loadingShapes || (wardGeo && thanaGeo)) return;
+    loadingShapes = true;
+    const j = async (u) => (await fetch(u)).json();
+    [wardGeo, thanaGeo] = await Promise.all([
+      j('/data/dhaka_wards.geojson'), j('/data/dhaka_thanas.geojson')]);
+  }
+  $effect(() => { if (!tiled) loadShapes(); });
   // Day/night comes from the sliced cells, which only exist at ward level.
   const canSplitTime = $derived(ruleLevel === 'ward' && level === 'ward' && category !== 'any');
 
@@ -114,12 +130,28 @@
   // What the tiled map needs: a plain id -> colour map, and hazards as points.
   // 'suppressed' is a sentinel, not a colour — the map draws it as texture,
   // because below-threshold is not a magnitude.
+  // Built from the id lists, not from polygon geometry: the colour of an area
+  // never depended on its shape, only on its id.
+  const areaIds = $derived(
+    level === 'ward' ? (wards?.wards ?? []).map(w => w.id)
+    : level === 'thana' ? (thanas?.thanas ?? []).map(t => t.id)
+    : []);
   const tileColors = $derived.by(() => {
     const o = {};
-    if (layer !== 'crime' || !shapes) return o;
-    for (const f of shapes.features) {
-      const c = fill(f.properties.id);
-      o[f.properties.id] = c === SUPPRESSED ? 'suppressed' : c === NO_DATA ? null : c;
+    if (layer !== 'crime') return o;
+    if (level === 'district') {
+      // One figure for the whole district. Painting every thana with it keeps
+      // the map on screen and says plainly that this category is not broken
+      // down further, instead of swapping the map for a one-row table.
+      const v = [...byArea.values()][0];
+      const c = !v ? null : v.n === null ? (v.suppressed ? 'suppressed' : null)
+                                         : colourFor(v.n, cuts);
+      for (const th of thanas?.thanas ?? []) o[th.id] = c;
+      return o;
+    }
+    for (const id of areaIds) {
+      const c = fill(id);
+      o[id] = c === SUPPRESSED ? 'suppressed' : c === NO_DATA ? null : c;
     }
     return o;
   });
@@ -288,11 +320,26 @@
     const a = p.get('a'); if (a) selected = a;
   }
 
+  // Selecting an area pushes a history entry, so the phone Back gesture closes
+  // the panel instead of leaving the site. Changing a filter replaces, because
+  // a back button that walks through every chip tap is worse than useless.
+  let lastPushedArea = null;
   $effect(() => {
     const h = stateToHash();
     if (typeof history === 'undefined') return;
     const url = h ? `#${h}` : location.pathname;
-    history.replaceState(null, '', url);
+    const areaChanged = String(selected) !== String(lastPushedArea);
+    if (areaChanged && selected != null) history.pushState(null, '', url);
+    else history.replaceState(null, '', url);
+    lastPushedArea = selected;
+  });
+
+  // ...and Back has to actually put the state back.
+  $effect(() => {
+    if (typeof window === 'undefined') return;
+    const onPop = () => { applyHash(); if (!location.hash) selected = null; };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
   });
 
   async function copyLink() {
@@ -310,6 +357,8 @@
   const detail = $derived(selected ?? hovered);
   function pick(id) { selected = String(selected) === String(id) ? null : id; }
 </script>
+
+<PageHead title={null} description={t.meta_map} />
 
 <!-- The hero used to open with a percentage. A number is evidence, not an
      invitation: it tells a visitor what we found, not what they can do. So the
@@ -343,7 +392,7 @@
     <button class:on={layer === 'crime'} onclick={() => { layer = 'crime'; selected = null; }}>{t.layer_crime}</button>
     <button class:on={layer === 'hazard'} onclick={() => { layer = 'hazard'; selected = null; }}>{t.layer_hazard}</button>
   </div>
-  {#if layer === 'crime'}
+  {#if layer === 'crime' && ruleLevel !== 'district'}
     <div class="seg">
       <button class:on={geo === 'thana'} onclick={() => { geo = 'thana'; selected = null; }}>{t.geo_thana}</button>
       <button class:on={geo === 'ward'} onclick={() => { geo = 'ward'; selected = null; }}>{t.geo_ward}</button>
@@ -387,11 +436,13 @@
   <!-- Only when the CATEGORY forces a coarser view. Thana-by-choice is not a
        privacy constraint and saying so here made the notice meaningless. -->
   {#if ruleLevel !== 'ward'}<p class="note">{t.coarse_note}</p>{/if}
+  {#if level === 'district'}<p class="note">{t.district_note}</p>{/if}
 
   {#if totals}
     <div class="counters">
       <div class="counter"><span class="n">{num(totals.crowd, ui.lang)}</span>
-        <span class="lbl">{t.crowd} <em class="unv">{t.unverified}</em></span></div>
+        <span class="lbl">{t.crowd} <em class="unv">{t.unverified}</em></span>
+        <span class="scope">{t.scope_cat.replace('{c}', catLabel)}</span></div>
       <div class="counter"><span class="n">{num(totals.press, ui.lang)}</span>
         <span class="lbl">{t.press}</span></div>
     </div>
@@ -441,9 +492,9 @@
 
   <div class="layout">
     <div class="mapwrap">
-      {#if tiled && !(layer === 'crime' && level === 'district')}
+      {#if tiled}
         <BaseMap
-          level={layer === 'hazard' ? 'ward' : level}
+          level={layer === 'hazard' ? 'ward' : level === 'district' ? 'thana' : level}
           colors={tileColors}
           hazards={tileHazards}
           {selected}
@@ -666,6 +717,10 @@
 {#if layer === 'crime' && summary.length}
   <section class="findings">
     <h2 class="fhead">{t.findings_title}</h2>
+    <!-- These are city-wide across every category, while the counters above
+         follow the current filter. Two totals on one page need to say which
+         is which, or a careful reader concludes the numbers are broken. -->
+    <p class="fscope">{t.scope_city}{#if demo} <span class="warn">· {t.demo_findings}</span>{/if}</p>
 
     <div class="ftiles">
       <div class="ftile">
@@ -785,8 +840,14 @@
     border-radius: 12px; padding: .7rem .9rem; }
   .counter .n { font-size: 1.7rem; font-weight: 700; display: block; font-variant-numeric: tabular-nums; }
   .counter .lbl { color: var(--dim); font-size: .85rem; }
-  .unv { color: var(--warn); border: 1px solid var(--warn); border-radius: 4px;
-    padding: 0 .3rem; font-size: .7rem; font-style: normal; margin-left: .3rem; }
+  .unv {
+    /* The most legally important word on the page was also the least readable:
+       #c9564b at 11.2px measures 4.09:1 against this panel, under the 4.5 floor.
+       A lighter step of the same warning hue measures 7.03:1, and the type is
+       up to 12px. Nothing else about it changes. */
+    color: #ea8a80; border: 1px solid #ea8a80; border-radius: 4px;
+    padding: .05rem .35rem; font-size: .75rem; font-style: normal;
+    margin-left: .3rem; white-space: nowrap; }
 
   .hero { margin: .6rem 0 1.4rem; }
   .hook { font-size: clamp(1.35rem, 4.2vw, 2.1rem); line-height: 1.25; margin: 0 0 .9rem;
@@ -806,6 +867,9 @@
   .stept { font-weight: 700; margin-bottom: .15rem; }
   .stepb { color: var(--dim); font-size: .86rem; line-height: 1.45; }
   .findings { margin: 1.6rem 0 1.2rem; }
+  .fscope { color: var(--dim); font-size: .82rem; margin: -.4rem 0 .8rem; }
+  .fscope .warn { color: var(--warn); margin-left: .4rem; }
+  .counter .scope { display: block; color: var(--dim); font-size: .75rem; margin-top: .15rem; }
   .fhead { font-size: 1.05rem; margin: 0 0 .7rem; }
   .ftiles { display: flex; gap: .8rem; flex-wrap: wrap; margin-bottom: 1rem; }
   .ftile { flex: 1 1 12rem; background: var(--panel); border: 1px solid var(--line);

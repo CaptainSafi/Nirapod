@@ -5,6 +5,7 @@
   // is correct — the alternative is a server-side record of a half-finished one.
   import { onMount } from 'svelte';
   import { ui } from '$lib/state.svelte.js';
+  import PageHead from '$lib/PageHead.svelte';
   import { strings } from '$lib/i18n.js';
   import { labels } from '$lib/labels.js';
   import { CATEGORIES, HAZARDS, METHOD, WHY_NOT, OUTCOMES, AMOUNT_BANDS,
@@ -37,9 +38,12 @@
 
   onMount(async () => {
     const j = async (u) => (await fetch(u)).json();
-    const [w, th, g] = await Promise.all([
-      j('/data/wards.json'), j('/data/thanas.json'), j('/data/dhaka_wards.geojson')]);
-    wards = w.wards; thanas = th.thanas; wardGeo = g;
+    // The ward polygons are only needed by the SVG fallback picker, which only
+    // runs when the map tiles are missing. 259 KB is not worth downloading on
+    // the chance that happens.
+    const [w, th] = await Promise.all([
+      j('/data/wards.json'), j('/data/thanas.json')]);
+    wards = w.wards; thanas = th.thanas;
 
     try {
       const r = await fetch('/api/pow', { cache: 'no-store' });
@@ -105,6 +109,10 @@
   // deployed: a reporter must always be able to say where, even on a static
   // review host with no map.
   let tiled = $state(true);
+  $effect(() => {
+    if (tiled || wardGeo) return;
+    fetch('/data/dhaka_wards.geojson').then(r => r.json()).then(g => (wardGeo = g));
+  });
   let pinLngLat = $state(null);
 
   function dropPin({ lon, lat, wardId }) {
@@ -150,6 +158,8 @@
   function chooseHazard(cat, sub) { hz.category = cat; hz.subcategory = sub; }
 </script>
 
+<PageHead title={t.nav_submit} description={t.meta_submit} />
+
 {#if done}
   <section class="card done">
     <h1>{t.thanks}</h1>
@@ -173,6 +183,9 @@
 
 {:else if !kind}
   <h1>{t.what_report}</h1>
+  <!-- Detected on load, so say it on the screen a reviewer actually starts on.
+       It used to appear only at step 5, after six screens of answering. -->
+  {#if reviewMode}<p class="reviewnote">{t.review_notice_early}</p>{/if}
   <div class="kinds">
     <button class="kind" onclick={() => { kind = 'incident'; step = 0; }}>
       <strong>{t.kind_incident}</strong><span>{t.kind_incident_sub}</span></button>
@@ -385,6 +398,10 @@
   .steps i { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
   .steps i.on { background: var(--accent); }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1rem; }
+  .reviewnote {
+    background: #2a2216; border: 1px solid var(--accent); color: var(--ink);
+    border-radius: 10px; padding: .6rem .8rem; font-size: .88rem; margin: 0 0 1rem;
+  }
   .kinds { display: flex; flex-direction: column; gap: .7rem; }
   .kind { display: flex; flex-direction: column; gap: .2rem; text-align: left;
     background: var(--panel); border: 1px solid var(--line); border-radius: 10px;

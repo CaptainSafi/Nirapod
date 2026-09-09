@@ -1,7 +1,12 @@
 <script>
   import { ui } from '$lib/state.svelte.js';
+  import PageHead from '$lib/PageHead.svelte';
+  import { strings } from '$lib/i18n.js';
   const bn = $derived(ui.lang === 'bn');
+  const t = $derived(strings[ui.lang]);
 </script>
+
+<PageHead title={t.nav_help} description={t.meta_gd} />
 
 <!-- Practical utility. Most visitors have not been mugged; they arrived
      because they are worried. A site that only collects reports serves the

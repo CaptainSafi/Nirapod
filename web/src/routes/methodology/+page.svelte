@@ -1,9 +1,12 @@
 <script>
   import { ui } from '$lib/state.svelte.js';
+  import PageHead from '$lib/PageHead.svelte';
   import { strings } from '$lib/i18n.js';
   const bn = $derived(ui.lang === 'bn');
   const t = $derived(strings[ui.lang]);
 </script>
+
+<PageHead title={t.nav_method} description={t.meta_method} />
 
 <h1>{bn ? 'পদ্ধতি ও তথ্যনীতি' : 'Methodology and data policy'}</h1>
 
