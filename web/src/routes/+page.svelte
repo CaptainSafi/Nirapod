@@ -129,6 +129,32 @@
       ? shownHazards.map(h => ({ id: h.id, lon: h.lon, lat: h.lat, state: hazardState(h) }))
       : []);
 
+  // --- city-wide findings ----------------------------------------------------
+  // GhushSite's headline is a money total. Ours cannot be: a report carries an
+  // amount BAND, never an amount, so a taka figure would be invented. What we
+  // have instead is the thing no official statistic publishes — what happened
+  // to the people who did go to the police — and it is a stronger headline
+  // because it is a finding rather than a volume.
+  const summary = $derived(agg?.summary ?? []);
+  const sumOf = (metric) => summary.filter(r => r.m === metric && r.n !== null)
+                                   .sort((a, b) => b.n - a.n);
+  const totalReports = $derived(summary.find(r => r.m === 'total' && r.b === 'all')?.n ?? null);
+  const wentToPolice = $derived(
+    summary.find(r => r.m === 'total' && r.b === 'reported_to_police')?.n ?? null);
+  const outcomes = $derived(sumOf('police_outcome'));
+  const whyNot = $derived(sumOf('why_not'));
+  // Amount bands keep their natural order: they are an ordered scale, and
+  // sorting them by size would destroy the only thing the order tells you.
+  const amountOrder = ['under_1k', '1k_5k', '5k_25k', '25k_100k', 'over_100k'];
+  const amounts = $derived(
+    amountOrder
+      .map(b => summary.find(r => r.m === 'amount_band' && r.b === b))
+      .filter(r => r && r.n !== null));
+  const areasWithData = $derived(
+    new Set((agg?.rollups ?? [])
+      .filter(r => r.l === level && r.n !== null).map(r => r.a)).size);
+  const share = (r) => (r.of ? r.n / r.of : 0);
+
   const totals = $derived.by(() => {
     if (!agg || !press) return null;
     const inScope = (c) => category === 'any' ? areaCrime().includes(c) : c === category;
@@ -637,6 +663,80 @@
 <!-- What happens to a report, in three steps, before anyone has to trust us.
      This is the whole privacy design in the only place most visitors will read
      it: the page they landed on. -->
+{#if layer === 'crime' && summary.length}
+  <section class="findings">
+    <h2 class="fhead">{t.findings_title}</h2>
+
+    <div class="ftiles">
+      <div class="ftile">
+        <div class="fbig">{num(totalReports, ui.lang)}</div>
+        <div class="flbl">{t.total_reports} <em class="unv">{t.unverified}</em></div>
+      </div>
+      <div class="ftile">
+        <div class="fbig">{num(areasWithData, ui.lang)}</div>
+        <div class="flbl">{t.areas_covered}</div>
+      </div>
+    </div>
+
+    <!-- One bar per outcome, one hue. These are shares of the same whole, not
+         separate series, so colour carries no extra meaning and every bar is
+         labelled with its own value. -->
+    {#if outcomes.length}
+      <div class="chart">
+        <h3 class="ctitle">{t.went_title}</h3>
+        <p class="csub">{fill1(t.went_sub, num(wentToPolice, ui.lang))}</p>
+        {#each outcomes as r (r.b)}
+          <div class="row">
+            <span class="rlbl">{L[r.b] ?? r.b}</span>
+            <span class="track" aria-hidden="true">
+              <span class="fill" style="width:{(share(r) * 100).toFixed(1)}%"></span>
+            </span>
+            <span class="rval">{pct(share(r), ui.lang)}
+              <span class="rn">{num(r.n, ui.lang)}</span></span>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
+    {#if amounts.length}
+      <div class="chart">
+        <h3 class="ctitle">{t.amount_title}</h3>
+        <p class="csub">{t.amount_sub}</p>
+        {#each amounts as r, i (r.b)}
+          <div class="row">
+            <span class="rlbl">{L[r.b] ?? r.b}</span>
+            <span class="track" aria-hidden="true">
+              <!-- Ordered bands take the ordered ramp from scale.js, the same
+                   one the map uses: one hue, monotone lightness, validated
+                   against this surface. -->
+              <span class="fill" style="width:{(share(r) * 100).toFixed(1)}%;
+                background:{RAMP[i]}"></span>
+            </span>
+            <span class="rval">{pct(share(r), ui.lang)}
+              <span class="rn">{num(r.n, ui.lang)}</span></span>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
+    {#if whyNot.length}
+      <div class="chart">
+        <h3 class="ctitle">{t.whynot_title}</h3>
+        {#each whyNot.slice(0, 5) as r (r.b)}
+          <div class="row">
+            <span class="rlbl">{L[r.b] ?? r.b}</span>
+            <span class="track" aria-hidden="true">
+              <span class="fill" style="width:{(share(r) * 100).toFixed(1)}%"></span>
+            </span>
+            <span class="rval">{pct(share(r), ui.lang)}
+              <span class="rn">{num(r.n, ui.lang)}</span></span>
+          </div>
+        {/each}
+      </div>
+    {/if}
+  </section>
+{/if}
+
 <section class="how">
   {#each [[t.how_1_t, t.how_1_b], [t.how_2_t, t.how_2_b], [t.how_3_t, t.how_3_b]] as [title, body], i}
     <div class="step">
@@ -705,6 +805,32 @@
              background: var(--line); color: var(--ink); }
   .stept { font-weight: 700; margin-bottom: .15rem; }
   .stepb { color: var(--dim); font-size: .86rem; line-height: 1.45; }
+  .findings { margin: 1.6rem 0 1.2rem; }
+  .fhead { font-size: 1.05rem; margin: 0 0 .7rem; }
+  .ftiles { display: flex; gap: .8rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .ftile { flex: 1 1 12rem; background: var(--panel); border: 1px solid var(--line);
+           border-radius: 12px; padding: .8rem .9rem; }
+  .fbig { font-size: 1.7rem; font-weight: 700; line-height: 1.1; }
+  .flbl { color: var(--dim); font-size: .84rem; margin-top: .2rem; }
+  .chart { background: var(--panel); border: 1px solid var(--line);
+           border-radius: 12px; padding: .9rem 1rem; margin-bottom: .8rem; }
+  .ctitle { font-size: .95rem; margin: 0 0 .15rem; }
+  .csub { color: var(--dim); font-size: .82rem; margin: 0 0 .7rem; }
+  /* label | bar | value. The bar is the only thing that scales, so the labels
+     stay left-aligned and the numbers stay readable at any width. */
+  .row { display: grid; grid-template-columns: minmax(6.5rem, 11rem) 1fr auto;
+         align-items: center; gap: .7rem; margin: .35rem 0; }
+  .rlbl { color: var(--ink); font-size: .85rem; }
+  .track { height: 10px; background: #ffffff0d; border-radius: 999px; overflow: hidden; }
+  .fill { display: block; height: 100%; background: var(--accent);
+          border-radius: 999px; min-width: 3px; }
+  .rval { font-variant-numeric: tabular-nums; font-size: .85rem; white-space: nowrap; }
+  .rn { color: var(--dim); font-size: .78rem; margin-left: .35rem; }
+  @media (max-width: 560px) {
+    .row { grid-template-columns: 1fr auto; row-gap: .2rem; }
+    .track { grid-column: 1 / -1; }
+  }
+
   .pattern { color: var(--dim); font-size: .9rem; border-left: 2px solid var(--accent);
              padding-left: .8rem; margin: -.4rem 0 1.2rem; max-width: 52rem; }
 

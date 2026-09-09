@@ -39,6 +39,13 @@
     // survive a link preview, but neither survives a cropped screenshot.
     watermark = false,
     onunavailable = () => {},
+    // --- pick mode -----------------------------------------------------------
+    // Used by the report flow to say where a hazard is. The map answers the
+    // ward question itself with queryRenderedFeatures against the tiles, so the
+    // page no longer downloads ward geometry just to run a point-in-polygon.
+    pick = false,
+    pinAt = null,                  // [lon, lat] or null
+    onpoint = () => {},            // ({ lon, lat, wardId }) => void
   } = $props();
 
   let container;
@@ -112,6 +119,17 @@
     map.setLayoutProperty('ward-line', 'visibility', 'visible');
   }
 
+  function applyPin() {
+    if (!map || !ready) return;
+    map.getSource('pin')?.setData({
+      type: 'FeatureCollection',
+      features: pinAt
+        ? [{ type: 'Feature', properties: {},
+             geometry: { type: 'Point', coordinates: pinAt } }]
+        : [],
+    });
+  }
+
   function applyHazards() {
     if (!map || !ready) return;
     map.getSource('hazards')?.setData({
@@ -124,6 +142,7 @@
     });
   }
 
+  $effect(() => { pinAt; applyPin(); });
   $effect(() => { colors; applyColors(); });
   $effect(() => { hazards; applyHazards(); });
   $effect(() => { if (level !== prevLevel) { prevLevel = level; applyLevel(); applyColors(); } });
@@ -213,10 +232,11 @@
         applyLevel();
         applyColors();
         applyHazards();
+        applyPin();
         applySelected(null, selected);
       });
 
-      for (const which of ['ward-fill', 'thana-fill']) {
+      for (const which of pick ? [] : ['ward-fill', 'thana-fill']) {
         map.on('mousemove', which, (e) => {
           const f = e.features?.[0];
           if (!f || which !== fillLayer) return;
@@ -237,6 +257,27 @@
           if (f && which === fillLayer) onpick(f.id);
         });
       }
+      if (pick) {
+        map.getCanvas().style.cursor = 'crosshair';
+        map.on('click', (e) => {
+          // Ward polygons come from our own admin tiles, so the answer is
+          // authoritative and needs no GeoJSON download. A tap outside every
+          // ward does nothing, which is the same rule the old picker had:
+          // Dhaka district only.
+          const hit = map.queryRenderedFeatures(e.point, { layers: ['ward-fill'] })[0];
+          if (!hit) return;
+          onpoint({
+            lon: Math.round(e.lngLat.lng * 1e5) / 1e5,
+            lat: Math.round(e.lngLat.lat * 1e5) / 1e5,
+            wardId: hit.properties?.id ?? hit.id,
+          });
+          // A pin dropped at city zoom is a guess. Zoom to the first tap so the
+          // next one can be the actual manhole; after that leave the view alone,
+          // because yanking the map on every correction is worse than imprecise.
+          if (map.getZoom() < 14) map.easeTo({ center: e.lngLat, zoom: 15.5, duration: 600 });
+        });
+      }
+
       for (const which of ['hazard-dot', 'hazard-halo']) {
         map.on('click', which, (e) => {
           const f = e.features?.[0];

@@ -31,6 +31,7 @@ export async function publish(db, outDir, { seedsDir, demo = false } = {}) {
 
   const cells = (await db.query(`SELECT * FROM public_cells()`)).rows;
   const rollups = (await db.query(`SELECT * FROM public_rollups()`)).rows;
+  const summary = (await db.query(`SELECT * FROM public_city_summary()`)).rows;
   const hazards = (await db.query(`SELECT * FROM public_hazards()`)).rows;
   const methods = (await db.query(`SELECT * FROM public_method_patterns()`)).rows;
   const scorecards = (await db.query(`SELECT * FROM public_thana_scorecards()`)).rows;
@@ -95,6 +96,17 @@ export async function publish(db, outDir, { seedsDir, demo = false } = {}) {
     }
   }
 
+  // The city summary is the coarsest thing published here, but it is still
+  // counts of people, so it gets the same refusal as everything else.
+  const kFloor = Math.min(...Object.values(kFor));
+  for (const r of summary) {
+    if (r.n != null && r.n < kFloor) {
+      throw new Error(
+        `refusing to publish: city summary ${r.metric}/${r.bucket} has n=${r.n} ` +
+        `below the floor ${kFloor}`);
+    }
+  }
+
   const generated_at = new Date().toISOString().slice(0, 10);   // day precision
 
   const files = {
@@ -122,6 +134,12 @@ export async function publish(db, outDir, { seedsDir, demo = false } = {}) {
         n: r.crowd_n, u: r.unreported_n, s: r.suppressed,
       })),
       any_threshold: anyK,
+      // City-wide totals and distributions. The one row of numbers a
+      // screenshot can carry, and the answer to "what happened when people
+      // did go to the police", which no official statistic publishes.
+      summary: summary.map(r => ({
+        m: r.metric, b: r.bucket, n: r.n, of: r.of_n,
+      })),
     },
     // Street hazards: exact points, no threshold, no victim. Separate file
     // because it is a separate disclosure rule, and mixing them in one payload

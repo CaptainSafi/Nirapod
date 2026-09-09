@@ -12,6 +12,7 @@
            SUPPORT_RESOURCE_CATEGORIES } from '$lib/taxonomy.js';
   import { num, recentWeeks, weekLabel } from '$lib/format.js';
   import { bounds, projector, unprojector, toPath, featureAt } from '$lib/geo.js';
+  import BaseMap from '$lib/BaseMap.svelte';
 
   const t = $derived(strings[ui.lang]);
   const L = $derived(labels[ui.lang]);
@@ -99,6 +100,19 @@
   const hproj = $derived(hb ? projector(hb, MW, MH) : null);
   const hunproj = $derived(hb ? unprojector(hb, MW, MH) : null);
   let pin = $state(null);
+  // The real map answers "which ward is this point in" from its own tiles.
+  // The SVG picker below is kept for the case where the tile archives are not
+  // deployed: a reporter must always be able to say where, even on a static
+  // review host with no map.
+  let tiled = $state(true);
+  let pinLngLat = $state(null);
+
+  function dropPin({ lon, lat, wardId }) {
+    pinLngLat = [lon, lat];
+    hz.lon = lon;
+    hz.lat = lat;
+    hz.ward_id = wardId;
+  }
 
   function tapMap(e) {
     const svg = e.currentTarget;
@@ -186,7 +200,17 @@
         {/each}
       {:else if step === 1}
         <p class="dim">{t.tap_map}</p>
-        {#if wardGeo && hproj}
+        {#if tiled}<p class="dim small">{t.tap_map_zoom}</p>{/if}
+        {#if tiled}
+          <!-- The same map as the front page, in pick mode: real streets, so a
+               reporter can find the actual manhole rather than guessing at a
+               shape. Zoom and pan are the point here, which the flat SVG could
+               never offer. -->
+          <div class="pickwrap">
+            <BaseMap pick pinAt={pinLngLat} onpoint={dropPin}
+                     lang={ui.lang} onunavailable={() => (tiled = false)} />
+          </div>
+        {:else if wardGeo && hproj}
           <svg class="pickmap" viewBox="0 0 {MW} {MH}" onclick={tapMap} role="presentation">
             {#each wardGeo.features as ft}
               <path d={toPath(ft.geometry, hproj)} fill="#1b1f23" stroke="#0f1113" stroke-width="0.6"/>
@@ -388,6 +412,7 @@
     padding: .5rem .6rem; border-radius: 6px; cursor: pointer; font: inherit; }
   .row:hover { border-color: var(--line); }
   .row.on { background: var(--accent); color: #16120c; }
+  .pickwrap { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
   .pickmap { width: 100%; height: auto; background: #101315; border-radius: 8px;
     border: 1px solid var(--line); cursor: crosshair; }
   .review { list-style: none; padding: 0; margin: 0 0 .8rem; }

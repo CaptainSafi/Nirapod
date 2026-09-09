@@ -90,6 +90,10 @@ export function style({
       admin: { type: 'vector', url: `pmtiles://${admin}`, promoteId: 'id',
                attribution: 'Boundaries: geoBoundaries (CC-BY 4.0)' },
       hazards: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+      // The pin the reporter drops when saying where a hazard is. One point,
+      // its own source, so nothing about the reporting flow can be confused
+      // with published data.
+      pin: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
     },
     layers: [
       { id: 'bg', type: 'background', paint: { 'background-color': C.bg } },
@@ -186,6 +190,15 @@ export function style({
       { id: 'thana-selected', type: 'line', source: 'admin', 'source-layer': 'thanas',
         paint: { 'line-color': C.selected,
           'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2.2, 0] } },
+
+      // The dropped pin, above everything: a ring plus a dot, so it reads as a
+      // marker rather than as another hazard already on the map.
+      { id: 'pin-ring', type: 'circle', source: 'pin',
+        paint: { 'circle-radius': 13, 'circle-color': 'rgba(226,183,20,.18)',
+                 'circle-stroke-color': C.selected, 'circle-stroke-width': 1.5 } },
+      { id: 'pin-dot', type: 'circle', source: 'pin',
+        paint: { 'circle-radius': 5, 'circle-color': C.selected,
+                 'circle-stroke-color': '#17130a', 'circle-stroke-width': 1.5 } },
 
       // Hazards: exact points, from a GeoJSON source the page keeps updated.
       // Shape carries the state as well as colour — a hollow ring for fixed —
