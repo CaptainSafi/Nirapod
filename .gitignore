@@ -12,3 +12,8 @@ Claude outputs/
 __pycache__/
 *.pyc
 *.tgz
+
+# Map tiles are build artifacts, not source. Build them with
+# scripts/build_basemap.py + scripts/build_admin_tiles.py, or fetch them
+# with scripts/fetch_tiles.sh. See docs/TILES.md.
+web/static/*.pmtiles
