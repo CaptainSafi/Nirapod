@@ -392,10 +392,12 @@
   </section>
 {/if}
 
-<!-- The dark slab. The map is read at night on a phone, and a dark basemap
-     lets the choropleth carry the only strong colour on screen. Everything
-     inside inherits the dark token set from .on-dark without knowing it. -->
-<div class="dash on-dark">
+<!-- The dashboard follows the page theme. It used to be a hardcoded dark slab,
+     from before the site had a real light mode; the only thing that still has
+     to be dark is the map canvas itself, because the basemap style is dark and
+     a light frame around a dark map looks like a bug. .on-dark now sits on the
+     map container alone, so its controls and attribution stay readable. -->
+<div class="dash">
 <!-- Filters in one row above the content they scope. -->
 <div class="controls">
   <div class="seg">
@@ -508,7 +510,7 @@
   </div>
 
   <div class="layout">
-    <div class="mapwrap">
+    <div class="mapwrap on-dark">
       {#if tiled}
         <BaseMap
           level={layer === 'hazard' ? 'ward' : level === 'district' ? 'thana' : level}
@@ -827,6 +829,7 @@
 <style>
   .dash {
     padding: 1.25rem clamp(1rem, 4vw, 3.5rem) 2rem;
+    background: var(--surface);
     border-block: 1px solid var(--line);
   }
   .err { color: var(--warn); }
@@ -927,7 +930,7 @@
   .layout { display: grid; grid-template-columns: minmax(0, 1fr) 19rem; gap: .8rem; align-items: stretch; }
   @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
 
-  .mapwrap { position: relative; background: var(--panel); border: 1px solid var(--line);
+  .mapwrap { position: relative; background: var(--bg); border: 1px solid var(--line);
     border-radius: 12px; overflow: hidden; }
 
   /* Search and the report button sit directly above the map, because those are

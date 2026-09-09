@@ -30,15 +30,16 @@
 
 <h2>{bn ? 'আমরা কী সংগ্রহ করি' : 'What we collect'}</h2>
 <p>{bn
-  ? 'বিভাগ, ওয়ার্ড, সপ্তাহ, দিনের সময়ভাগ, পুলিশে জানানো হয়েছিল কি না, এবং না জানানোর কারণ। ব্যস।'
-  : 'Category, ward, week, time of day, whether it was reported to the police, and if not, why. That is all.'}</p>
+  ? 'বিভাগ, ওয়ার্ড, ঘটনার তারিখ ও সময়, পুলিশে জানানো হয়েছিল কি না, না জানানোর কারণ, এবং আপনি চাইলে নিজের ভাষায় লেখা বিবরণ।'
+  : 'Category, ward, the date and time it happened, whether it was reported to the police, if not why, and, if you choose to write one, your own account of it.'}</p>
+<p>{bn
+  ? 'তারিখ ও লেখা বিবরণ সংগ্রহ করা হয়, কিন্তু হুবহু প্রকাশ করা হয় না। মানচিত্রে ও তালিকায় সপ্তাহ দেখানো হয়, নির্দিষ্ট দিন নয়, কারণ ওয়ার্ড ও ধরনের সঙ্গে নির্দিষ্ট দিন মিলিয়ে একজন মানুষকে চিহ্নিত করা যায়।'
+  : 'The date and the written account are collected but not published as given. The map and the tables show the week, never the day, because a day combined with a ward and a category is enough to pick out one person.'}</p>
 
 <h2>{bn ? 'আমরা যা দেখতে পাই না' : 'What we cannot see'}</h2>
 <ul>
   <li>{bn ? 'আপনার আইপি ঠিকানা: কোথাও লেখা হয় না।' : 'Your IP address: never written to disk, at any layer.'}</li>
   <li>{bn ? 'আপনার অবস্থান: জিপিএস চাওয়া হয় না।' : 'Your location: the page never asks the browser for GPS.'}</li>
-  <li>{bn ? 'নির্দিষ্ট তারিখ বা সময়: শুধু সপ্তাহ ও সময়ভাগ।' : 'An exact date or time: only the week and a broad time band.'}</li>
-  <li>{bn ? 'কোনো লেখা বিবরণ: ফর্মে লেখার ঘরই নেই।' : 'Any written narrative: the form has no text box at all.'}</li>
   <li>{bn ? 'অ্যাকাউন্ট, ইমেইল, ফোন নম্বর: কিছুই নেই।' : 'An account, an email, a phone number: none exist.'}</li>
 </ul>
 

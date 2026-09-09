@@ -5,6 +5,7 @@
   // is correct — the alternative is a server-side record of a half-finished one.
   import { onMount } from 'svelte';
   import { loadPlaces, searchPlaces, placeLabel, placeWhere } from '$lib/places.js';
+  import Calendar from '$lib/Calendar.svelte';
   import { ui } from '$lib/state.svelte.js';
   import PageHead from '$lib/PageHead.svelte';
   import { strings } from '$lib/i18n.js';
@@ -34,11 +35,33 @@
 
   let f = $state({
     category: null, subcategory: null, ward_id: null, thana_id: null,
-    occurred_week: null, time_band: null, reported_to_police: null,
+    occurred_week: null, occurred_on: null, occurred_time: null,
+    time_band: null, reported_to_police: null,
+    // Free text, capped. Never published as written: it exists so a reporter is
+    // not trapped inside the chip lists, and so a moderator can see what the
+    // chips could not express.
+    account: '',
     why_not_reported: null, police_outcome: null, amount_band: null,
     offender_count: null, offender_vehicle: null, weapon: null, approach: null,
   });
   let hz = $state({ category: null, subcategory: null, lon: null, lat: null, ward_id: null });
+  // The exact day, kept in the browser only. It is what the calendar shows and
+  // what mondayOf() turns into the week that actually gets sent.
+  let occurredOn = $state(null);
+
+  // Things that must not go in free text, caught as they are typed rather than
+  // after the fact. This is a warning, not a block: it is the reporter's
+  // account and they may have a reason, but they should know what they are
+  // about to hand over.
+  const RISKY = [
+    { re: /(?:\+?880|0)1[3-9]\d{8}/, bn: 'ফোন নম্বর', en: 'a phone number' },
+    { re: /\b\d{10,17}\b/, bn: 'এনআইডি বা লম্বা নম্বর', en: 'an ID number' },
+    { re: /[\w.+-]+@[\w-]+\.[\w.]+/, bn: 'ইমেইল ঠিকানা', en: 'an email address' },
+    { re: /https?:\/\/|www\./i, bn: 'লিংক', en: 'a link' },
+  ];
+  const ACCOUNT_MAX = 600;
+  const accountRisks = $derived(
+    RISKY.filter((r) => r.re.test(f.account)).map((r) => (ui.lang === 'bn' ? r.bn : r.en)));
 
   onMount(async () => {
     const j = async (u) => (await fetch(u)).json();
@@ -228,6 +251,7 @@
   <div class="steps">{#each titles as _, i}<i class:on={i <= step}></i>{/each}</div>
   <h1>{titles[step]}</h1>
 
+  <div class="work">
   <section class="card">
     {#if kind === 'hazard'}
       {#if step === 0}
@@ -250,7 +274,9 @@
                reporter can find the actual manhole rather than guessing at a
                shape. Zoom and pan are the point here, which the flat SVG could
                never offer. -->
-          <div class="pickwrap">
+          <!-- Dark like the map on the dashboard, for the same reason: the
+               basemap style is dark and a light frame around it reads as a bug. -->
+          <div class="pickwrap on-dark">
             <BaseMap pick pinAt={pinLngLat} onpoint={dropPin}
                      lang={ui.lang} onunavailable={() => (tiled = false)} />
           </div>
@@ -337,19 +363,27 @@
       <p class="dim ward_note">{t.place_to_ward}</p>
 
     {:else if step === 2}
-      <div class="grid">
-        {#each recentWeeks(8) as wk}
-          <button class="opt" class:on={f.occurred_week === wk}
-            onclick={() => (f.occurred_week = wk)}>{weekLabel(wk, ui.lang)}</button>
-        {/each}
-      </div>
+      <Calendar value={occurredOn} lang={ui.lang}
+        onpick={(day, week) => { occurredOn = day; f.occurred_on = day; f.occurred_week = week; }} />
       <p class="dim">{ui.lang === 'bn'
-        ? 'আমরা শুধু সপ্তাহ নিই, নির্দিষ্ট তারিখ নয়।'
-        : 'We take the week only, never the exact date.'}</p>
+        ? 'দিনটি বেছে নিন। তারিখ সংরক্ষণ করা হয়, তবে মানচিত্রে সপ্তাহ হিসেবে দেখানো হয়, তাই পুরো সপ্তাহটি রঙিন হয়।'
+        : 'Pick the day. The date is kept, but it is published as a week, which is why the whole week lights up.'}</p>
       <div class="grid sub">
         {#each TIME_BANDS as b}
           <button class="opt" class:on={f.time_band === b} onclick={() => (f.time_band = b)}>{L[b]}</button>
         {/each}
+      </div>
+      <!-- Exact time is optional and the band is not. Someone who remembers
+           "about nine at night" should not be made to invent 21:00, and the
+           band is what the published tables are built from either way. -->
+      <div class="timerow">
+        <label for="exact-time">{ui.lang === 'bn' ? 'সময় মনে থাকলে' : 'If you remember the time'}</label>
+        <input id="exact-time" class="timein" type="time" bind:value={f.occurred_time} />
+        {#if f.occurred_time}
+          <button class="linkish" type="button" onclick={() => (f.occurred_time = null)}>
+            {ui.lang === 'bn' ? 'মুছুন' : 'Clear'}
+          </button>
+        {/if}
       </div>
 
     {:else if step === 3}
@@ -368,6 +402,29 @@
           </div>
         </div>
       {/each}
+
+      <!-- In your own words. The chips above cover the common shapes and nothing
+           else, so without this a reporter whose experience does not fit the
+           list has no way to say so. It is optional, it is capped, and it is not
+           published as written. -->
+      <div class="group own">
+        <div class="gtitle">{t.own_words}</div>
+        <textarea class="account" id="account" rows="5" maxlength={ACCOUNT_MAX}
+          bind:value={f.account} placeholder={t.own_words_ph}></textarea>
+        <div class="meter">
+          <span class="dim">{t.own_words_note}</span>
+          <span class="dim count" class:near={f.account.length > ACCOUNT_MAX - 60}>
+            {num(f.account.length, ui.lang)} / {num(ACCOUNT_MAX, ui.lang)}
+          </span>
+        </div>
+        {#if accountRisks.length}
+          <p class="risk">
+            {ui.lang === 'bn'
+              ? `আপনি ${accountRisks.join(', ')} লিখেছেন বলে মনে হচ্ছে। এগুলো বাদ দিলে আপনাকে চেনা কঠিন হবে।`
+              : `That looks like it contains ${accountRisks.join(', ')}. Removing it makes you harder to identify.`}
+          </p>
+        {/if}
+      </div>
 
     {:else if step === 4}
       <div class="grid">
@@ -429,6 +486,73 @@
     {/if}
   </section>
 
+  <!-- The report as it stands, built while it is being filled in.
+       Two jobs. It shows progress on a form that is otherwise six blind steps,
+       which is where people give up. And it shows the reporter exactly what
+       will be published about them BEFORE they commit, which on a site asking
+       frightened people to trust it is worth more than any reassurance. -->
+  <aside class="preview" aria-live="polite">
+    <h2>{t.preview_title}</h2>
+    {#if kind === 'hazard'}
+      <dl>
+        <dt>{t.q_hazard_what}</dt>
+        <dd class:pending={!hz.subcategory}>{hz.subcategory ? L[hz.subcategory] : t.preview_pending}</dd>
+        <dt>{t.q_hazard_where}</dt>
+        <dd class:pending={hz.ward_id == null}>
+          {hz.ward_id != null && wardById.get(String(hz.ward_id))
+            ? wardLabel(wardById.get(String(hz.ward_id))) : t.preview_pending}
+        </dd>
+      </dl>
+    {:else}
+      <dl>
+        <dt>{t.q_what}</dt>
+        <dd class:pending={!f.subcategory}>
+          {f.subcategory ? `${L[f.category]} · ${L[f.subcategory]}` : t.preview_pending}
+        </dd>
+
+        <dt>{t.q_where}</dt>
+        <dd class:pending={!f.ward_id}>
+          {#if chosenPlace}
+            {placeLabel(chosenPlace, ui.lang)}<span class="sub">{placeWhere(chosenPlace, ui.lang)}</span>
+          {:else if f.ward_id && wardById.get(String(f.ward_id))}
+            {wardLabel(wardById.get(String(f.ward_id)))}
+          {:else}{t.preview_pending}{/if}
+        </dd>
+
+        <dt>{t.q_when}</dt>
+        <dd class:pending={!f.occurred_week}>
+          {#if f.occurred_week}
+            {weekLabel(f.occurred_week, ui.lang)}{f.time_band ? ` · ${L[f.time_band]}` : ''}{f.occurred_time ? ` · ${f.occurred_time}` : ''}
+          {:else}{t.preview_pending}{/if}
+        </dd>
+
+        {#if f.offender_count || f.offender_vehicle || f.weapon || f.approach}
+          <dt>{t.q_how}</dt>
+          <dd>{[f.offender_count, f.offender_vehicle, f.weapon, f.approach]
+                .filter(Boolean).map((v) => L[v]).join(' · ')}</dd>
+        {/if}
+
+        {#if f.account.trim()}
+          <dt>{t.own_words}</dt>
+          <dd class="quote">{f.account.trim()}</dd>
+        {/if}
+
+        {#if f.amount_band}<dt>৳</dt><dd>{L[f.amount_band]}</dd>{/if}
+
+        {#if f.reported_to_police !== null}
+          <dt>{t.q_reported}</dt>
+          <dd>{f.reported_to_police
+            ? `${t.yes}${f.police_outcome ? ' · ' + L[f.police_outcome] : ''}`
+            : `${t.no}${f.why_not_reported ? ' · ' + L[f.why_not_reported] : ''}`}</dd>
+        {/if}
+      </dl>
+    {/if}
+    <p class="dim fine">{ui.lang === 'bn'
+      ? 'এটুকুই পাঠানো হবে। নাম, ফোন নম্বর বা অবস্থান কিছুই নয়।'
+      : 'This is all that is sent. No name, no phone number, no location.'}</p>
+  </aside>
+  </div>
+
   <div class="nav">
     <button class="btn ghost" onclick={() => { if (step === 0) kind = null; else step--; }}>{t.back}</button>
     {#if step < titles.length - 1}
@@ -438,6 +562,28 @@
 {/if}
 
 <style>
+  /* Form and preview side by side on a desktop; on a phone the preview drops
+     below the form, where it is still visible after a choice is made. */
+  .work { display: grid; gap: 1.2rem; grid-template-columns: minmax(0, 1fr) 20rem; align-items: start; }
+  @media (max-width: 900px) { .work { grid-template-columns: 1fr; } }
+  .preview {
+    position: sticky; top: 5rem;
+    border: 1px solid var(--line); border-radius: 12px;
+    background: var(--surface); padding: 1rem 1.1rem;
+  }
+  @media (max-width: 900px) { .preview { position: static; } }
+  .preview h2 { margin: 0 0 .8rem; font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+  .preview dl { margin: 0; display: grid; gap: .15rem; }
+  .preview dt { font-size: .75rem; color: var(--dim); margin-top: .7rem; }
+  .preview dt:first-of-type { margin-top: 0; }
+  .preview dd { margin: 0; font-weight: 500; }
+  .preview dd.pending { font-weight: 400; color: var(--dim); font-style: italic; }
+  .preview dd .sub { display: block; font-weight: 400; font-size: .8rem; color: var(--dim); }
+  .preview dd.quote {
+    font-weight: 400; font-size: .9rem; border-left: 2px solid var(--line-strong);
+    padding-left: .6rem; margin-top: .2rem; white-space: pre-wrap; overflow-wrap: break-word;
+  }
+  .preview .fine { margin: 1rem 0 0; padding-top: .7rem; border-top: 1px solid var(--line); font-size: .78rem; }
   .steps { display: flex; gap: .3rem; margin: .5rem 0 1rem; }
   .steps i { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
   .steps i.on { background: var(--accent); }
@@ -481,6 +627,29 @@
   .empty { padding: .6rem .2rem; }
   .ward_note { margin-top: .7rem; font-size: .85rem; }
   .pickwrap { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .timerow { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; margin-top: .9rem; }
+  .timerow label { font-size: .88rem; color: var(--dim); }
+  .timein {
+    padding: .45rem .6rem; border-radius: 8px; border: 1px solid var(--line-strong);
+    background: var(--field); color: var(--ink); font: inherit;
+  }
+  .linkish { background: none; border: 0; color: var(--dim); font: inherit; font-size: .85rem;
+    text-decoration: underline; cursor: pointer; padding: 0; }
+  .linkish:hover { color: var(--ink); }
+  .own { margin-top: 1.4rem; border-top: 1px solid var(--line); padding-top: 1.2rem; }
+  .account {
+    width: 100%; padding: .7rem .85rem; border-radius: 10px;
+    border: 1px solid var(--line-strong); background: var(--field); color: var(--ink);
+    font: inherit; line-height: 1.7; resize: vertical; min-height: 7rem;
+  }
+  .account:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .meter { display: flex; gap: 1rem; align-items: baseline; margin-top: .45rem; font-size: .85rem; }
+  .meter .count { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .meter .count.near { color: var(--warn); }
+  .risk {
+    margin: .6rem 0 0; padding: .55rem .8rem; font-size: .88rem;
+    color: var(--warn); border: 1px solid var(--warn); border-radius: 8px;
+  }
   .pickmap { width: 100%; height: auto; background: var(--field); border-radius: 8px;
     border: 1px solid var(--line); cursor: crosshair; }
   .review { list-style: none; padding: 0; margin: 0 0 .8rem; }
