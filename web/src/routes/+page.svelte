@@ -392,6 +392,10 @@
   </section>
 {/if}
 
+<!-- The dark slab. The map is read at night on a phone, and a dark basemap
+     lets the choropleth carry the only strong colour on screen. Everything
+     inside inherits the dark token set from .on-dark without knowing it. -->
+<div class="dash on-dark">
 <!-- Filters in one row above the content they scope. -->
 <div class="controls">
   <div class="seg">
@@ -723,6 +727,7 @@
       : 'A hazard has no victim, so it is shown at its exact spot with no threshold. The clock keeps running until it is fixed.'}
   {/if}
 </p>
+</div>
 
 <!-- What happens to a report, in three steps, before anyone has to trust us.
      This is the whole privacy design in the only place most visitors will read
@@ -820,6 +825,10 @@
 <p class="pattern">{t.pattern_line}</p>
 
 <style>
+  .dash {
+    padding: 1.25rem clamp(1rem, 4vw, 3.5rem) 2rem;
+    border-block: 1px solid var(--line);
+  }
   .err { color: var(--warn); }
   .small { font-size: .82rem; }
   .headline { display: flex; gap: 1rem; align-items: center; background: var(--panel);
@@ -833,15 +842,15 @@
   .seg.right { margin-left: auto; }
   .seg button { background: transparent; border: 0; color: var(--dim); padding: .45rem .8rem;
     cursor: pointer; font: inherit; font-size: .88rem; transition: background .15s, color .15s; }
-  .seg button:hover { color: var(--ink); background: #ffffff08; }
-  .seg button.on { background: var(--accent); color: #16120c; font-weight: 600; }
+  .seg button:hover { color: var(--ink); background: var(--raise); }
+  .seg button.on { background: var(--accent); color: var(--on-accent); font-weight: 600; }
 
   .cats { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; margin-bottom: .8rem; }
-  .chip { background: none; border: 1px solid var(--line); color: var(--dim);
+  .chip { background: none; border: 1px solid var(--line-strong); color: var(--dim);
     border-radius: 999px; padding: .3rem .75rem; font: inherit; font-size: .82rem;
     cursor: pointer; transition: border-color .15s, color .15s, background .15s; }
   .chip:hover { color: var(--ink); border-color: var(--dim); }
-  .chip.on { background: var(--accent); border-color: var(--accent); color: #16120c; font-weight: 600; }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
   .chip.pd { border-style: dashed; }
   .chip.clear { border-style: dotted; }
   .divider { width: 1px; height: 20px; background: var(--line); margin: 0 .3rem; }
@@ -856,7 +865,7 @@
        #c9564b at 11.2px measures 4.09:1 against this panel, under the 4.5 floor.
        A lighter step of the same warning hue measures 7.03:1, and the type is
        up to 12px. Nothing else about it changes. */
-    color: #ea8a80; border: 1px solid #ea8a80; border-radius: 4px;
+    color: var(--warn); border: 1px solid var(--warn); border-radius: 4px;
     padding: .05rem .35rem; font-size: .75rem; font-style: normal;
     margin-left: .3rem; white-space: nowrap; }
 
@@ -901,7 +910,7 @@
   .row { display: grid; grid-template-columns: minmax(6.5rem, 11rem) 1fr auto;
          align-items: center; gap: .7rem; margin: .35rem 0; }
   .rlbl { color: var(--ink); font-size: .85rem; }
-  .track { height: 10px; background: #ffffff0d; border-radius: 999px; overflow: hidden; }
+  .track { height: 10px; background: var(--raise-2); border-radius: 999px; overflow: hidden; }
   .fill { display: block; height: 100%; background: var(--accent);
           border-radius: 999px; min-width: 3px; }
   .rval { font-variant-numeric: tabular-nums; font-size: .85rem; white-space: nowrap; }
@@ -940,7 +949,7 @@
   .cta {
     display: inline-flex; align-items: center; white-space: nowrap;
     padding: .45rem .8rem; border-radius: 999px; text-decoration: none;
-    background: var(--accent); color: #17130a; font-weight: 700;
+    background: var(--accent); color: var(--on-accent); font-weight: 700;
   }
   .cta.wide { display: flex; justify-content: center; margin-top: .6rem; }
   .chip.any { border-style: solid; font-weight: 700; }
@@ -993,13 +1002,13 @@
   .sparkx { display: flex; justify-content: space-between; color: var(--dim); font-size: .7rem;
     padding: 0 .2rem; }
 
-  .search { width: 100%; padding: .55rem .8rem; border-radius: 8px; border: 1px solid var(--line);
-    background: #101315; color: var(--ink); font: inherit; margin-bottom: .6rem; }
+  .search { width: 100%; padding: .55rem .8rem; border-radius: 8px; border: 1px solid var(--line-strong);
+    background: var(--field); color: var(--ink); font: inherit; margin-bottom: .6rem; }
   .listing { width: 100%; border-collapse: collapse; font-size: .9rem; }
   .listing th, .listing td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); }
   .listing th { color: var(--dim); font-weight: 500; font-size: .8rem; }
   .listing td.r, .listing th.r { text-align: right; font-variant-numeric: tabular-nums; }
-  .listing tr.sel { background: #ffffff0a; }
+  .listing tr.sel { background: var(--raise); }
   .linkish { background: none; border: 0; color: var(--ink); font: inherit; cursor: pointer;
     padding: 0; text-align: left; }
   .linkish:hover { color: var(--accent); }
@@ -1011,7 +1020,7 @@
     vertical-align: -1px; margin-right: .3rem; }
   .legend i.dot { border-radius: 50%; width: 9px; height: 9px; }
   .legend i.dot.big { width: 12px; height: 12px; }
-  .legend i.dot.hollow { background: none; border: 2px solid #6b7280; width: 9px; height: 9px; }
+  .legend i.dot.hollow { background: none; border: 2px solid var(--dim); width: 9px; height: 9px; }
   .hatchswatch { background: repeating-linear-gradient(45deg,#1b1f23,#1b1f23 3px,#3a4149 3px,#3a4149 5px); }
 
   .note { color: var(--dim); font-size: .85rem; border-left: 2px solid var(--line); padding-left: .8rem; }

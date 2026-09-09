@@ -41,8 +41,12 @@ console.log('2/5  unpacking the map tiles…');
 {
   const archive = LIGHT ? 'dhaka-z14.pmtiles' : 'dhaka.pmtiles';
   const tilesRoot = path.join(ROOT, 'web', 'static', 'tiles');
-  await rm(tilesRoot, { recursive: true, force: true });
   const meta = {};
+  const { stat: statFile } = await import('node:fs/promises');
+  // Unpacking is deterministic and takes over a minute. Skip it when the
+  // pyramid is already newer than the archive it came from, which is every
+  // build during a UI change. TILES=force to unpack anyway.
+  const force = process.env.TILES === 'force';
   for (const [name, file] of [['base', archive], ['admin', 'dhaka_admin.pmtiles']]) {
     const src = path.join(ROOT, 'web', 'static', file);
     try { await access(src); } catch {
@@ -51,16 +55,27 @@ console.log('2/5  unpacking the map tiles…');
       process.exit(1);
     }
     const out = path.join(tilesRoot, name);
+    const json = path.join(out, 'tiles.json');
+    let fresh = false;
+    if (!force) {
+      try { fresh = (await statFile(json)).mtimeMs >= (await statFile(src)).mtimeMs; }
+      catch { fresh = false; }
+    }
     // --inflate is not optional in practice. Cloudflare Pages strips
     // Content-Encoding out of _headers, so gzip-as-stored tiles reach the
     // browser as raw 1f 8b bytes and MapLibre cannot parse them. Measured on a
     // live deploy. Cloudflare compresses on the wire by itself anyway, so this
     // costs build size, not transfer size.
-    const r = spawnSync(node, [path.join(ROOT, 'scripts', 'explode-pmtiles.js'), src, out, '--inflate'],
-      { stdio: 'inherit' });
-    if (r.status !== 0) process.exit(r.status ?? 1);
+    if (fresh) {
+      console.log(`     ${name}: up to date, skipping (TILES=force to redo)`);
+    } else {
+      await rm(out, { recursive: true, force: true });
+      const r = spawnSync(node, [path.join(ROOT, 'scripts', 'explode-pmtiles.js'), src, out, '--inflate'],
+        { stdio: 'inherit' });
+      if (r.status !== 0) process.exit(r.status ?? 1);
+    }
     const { readFile } = await import('node:fs/promises');
-    meta[name] = JSON.parse(await readFile(path.join(out, 'tiles.json'), 'utf8'));
+    meta[name] = JSON.parse(await readFile(json, 'utf8'));
   }
   // Zoom range comes out of the archive header, not out of somebody's memory.
   // A style claiming maxzoom 15 over a zoom-14 pyramid asks for tiles that do

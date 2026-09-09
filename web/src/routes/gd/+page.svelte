@@ -57,7 +57,7 @@
 
 <style>
   h2 { margin-top: 1.8rem; }
-  li { color: #cdd5dd; margin: .35rem 0; }
+  li { color: var(--ink); margin: .35rem 0; }
   a { color: var(--accent); }
   .nums { list-style: none; padding: 0; }
   .nums li { display: flex; align-items: baseline; gap: .7rem; margin: .5rem 0; }

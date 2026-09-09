@@ -147,8 +147,8 @@
   .wtoggle:hover { border-color: var(--dim); }
   .small { font-size: .82rem; }
   .names { color: var(--dim); font-size: .85rem; line-height: 1.7; }
-  .search { width: 100%; padding: .55rem .8rem; border-radius: 8px; border: 1px solid var(--line);
-    background: #101315; color: var(--ink); font: inherit; margin-bottom: .7rem; }
+  .search { width: 100%; padding: .55rem .8rem; border-radius: 8px; border: 1px solid var(--line-strong);
+    background: var(--field); color: var(--ink); font: inherit; margin-bottom: .7rem; }
   .scroll { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: .92rem; min-width: 30rem; }
   th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--line); }

@@ -90,7 +90,7 @@
   .demo-first { border: 1px solid var(--warn); border-radius: 10px;
     padding: .2rem 1rem 1rem; margin: 1rem 0 2rem; }
   .demo-first h2 { color: var(--warn); margin-top: 1rem; }
-  p, li { color: #cdd5dd; }
+  p, li { color: var(--ink); }
   .warn { color: var(--warn); }
   a { color: var(--accent); }
 </style>

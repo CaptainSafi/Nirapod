@@ -31,7 +31,7 @@
   .code { color: var(--dim); font-size: .8rem; }
   .links { display: flex; gap: .8rem; justify-content: center; flex-wrap: wrap;
            margin-top: 1.4rem; }
-  .cta { background: var(--accent); color: #17130a; text-decoration: none;
+  .cta { background: var(--accent); color: var(--on-accent); text-decoration: none;
          font-weight: 700; border-radius: 999px; padding: .5rem 1.1rem; }
   .plain { color: var(--dim); text-decoration: none; align-self: center; }
   .plain:hover { color: var(--ink); }

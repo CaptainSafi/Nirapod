@@ -407,7 +407,7 @@
   .steps i.on { background: var(--accent); }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1rem; }
   .reviewnote {
-    background: #2a2216; border: 1px solid var(--accent); color: var(--ink);
+    background: var(--accent-tint); border: 1px solid var(--accent); color: var(--ink);
     border-radius: 10px; padding: .6rem .8rem; font-size: .88rem; margin: 0 0 1rem;
   }
   .kinds { display: flex; flex-direction: column; gap: .7rem; }
@@ -423,27 +423,27 @@
   .gtitle { color: var(--dim); font-size: .8rem; margin-bottom: .35rem; }
   .cats { display: flex; flex-wrap: wrap; gap: .35rem; }
   .cats.pd { margin-top: .5rem; padding-top: .5rem; border-top: 1px dashed var(--line); }
-  .chip { background: none; border: 1px solid var(--line); color: var(--ink);
+  .chip { background: none; border: 1px solid var(--line-strong); color: var(--ink);
     border-radius: 999px; padding: .35rem .8rem; font: inherit; font-size: .85rem; cursor: pointer; }
-  .chip.on { background: var(--accent); border-color: var(--accent); color: #16120c; font-weight: 600; }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
   .chip.pdc { border-style: dashed; }
-  .opt { background: none; border: 1px solid var(--line); color: var(--ink);
+  .opt { background: none; border: 1px solid var(--line-strong); color: var(--ink);
     border-radius: 8px; padding: .6rem .9rem; cursor: pointer; font: inherit; text-align: left; }
-  .opt.on { background: var(--accent); color: #16120c; border-color: var(--accent); font-weight: 600; }
-  .search { width: 100%; padding: .6rem .8rem; border-radius: 8px; border: 1px solid var(--line);
-    background: #101315; color: var(--ink); font: inherit; }
+  .opt.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
+  .search { width: 100%; padding: .6rem .8rem; border-radius: 8px; border: 1px solid var(--line-strong);
+    background: var(--field); color: var(--ink); font: inherit; }
   .list { max-height: 320px; overflow: auto; margin-top: .6rem; display: flex; flex-direction: column; gap: .25rem; }
   .row { text-align: left; background: none; border: 1px solid transparent; color: var(--ink);
     padding: .5rem .6rem; border-radius: 6px; cursor: pointer; font: inherit; }
   .row:hover { border-color: var(--line); }
-  .row.on { background: var(--accent); color: #16120c; }
+  .row.on { background: var(--accent); color: var(--on-accent); }
   .pickwrap { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-  .pickmap { width: 100%; height: auto; background: #101315; border-radius: 8px;
+  .pickmap { width: 100%; height: auto; background: var(--field); border-radius: 8px;
     border: 1px solid var(--line); cursor: crosshair; }
   .review { list-style: none; padding: 0; margin: 0 0 .8rem; }
   .review li { display: flex; gap: .6rem; padding: .4rem 0; border-bottom: 1px solid var(--line); }
   .review span { color: var(--dim); min-width: 9rem; }
-  .btn { background: var(--accent); color: #16120c; border: 0; border-radius: 8px;
+  .btn { background: var(--accent); color: var(--on-accent); border: 0; border-radius: 8px;
     padding: .6rem 1.1rem; font: inherit; font-weight: 600; cursor: pointer;
     text-decoration: none; display: inline-block; }
   .btn.ghost { background: none; border: 1px solid var(--line); color: var(--ink); }
