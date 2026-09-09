@@ -17,6 +17,13 @@ __pycache__/
 # scripts/build_basemap.py + scripts/build_admin_tiles.py, or fetch them
 # with scripts/fetch_tiles.sh. See docs/TILES.md.
 web/static/*.pmtiles
+# ...except the two the live site needs. Cloudflare Pages builds from this
+# repo, so a tile archive that is not committed here means a deployed site
+# with a blank map. dhaka.pmtiles (50 MB, full detail) deliberately stays
+# out: it is over the 25 MiB per-file limit Pages enforces. Build it locally
+# per docs/TILES.md when you want zoom 15.
+!web/static/dhaka-z14.pmtiles
+!web/static/dhaka_admin.pmtiles
 
 # Generated at build time from og-demo.png / og-beta.png
 web/static/og.png
