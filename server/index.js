@@ -18,6 +18,7 @@ import { open, SEEDS } from './db.js';
 import * as pow from './pow.js';
 import * as abuse from './abuse.js';
 import { validate, validateHazard } from './validate.js';
+import { redact } from './redact.js';
 import { route, routeHazard } from './rules.js';
 import { publish } from './aggregate.js';
 
@@ -161,16 +162,29 @@ const publicServer = http.createServer(async (req, res) => {
     });
 
     try {
+      // The account is redacted HERE, before the insert, and the original is
+      // not kept anywhere. If a filter had to remove something the account is
+      // held rather than published: the reporter has already shown they will
+      // write identifying detail, and the next sentence may carry the kind no
+      // regex can catch.
+      const acc = redact(body.account);
+      const accountState = acc.text == null ? 'none'
+        : acc.removed.length ? 'held' : 'published';
+
       await db.query(
         `INSERT INTO reports
            (category, subcategory, ward_id, thana_id, occurred_week, time_band,
             amount_band, reported_to_police, why_not_reported, police_outcome,
+            occurred_on, occurred_time, account, account_state, account_at,
             status, pow_nonce)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
         [body.category, body.subcategory, body.ward_id, body.thana_id ?? null,
          body.occurred_week, body.time_band, body.amount_band ?? null,
          body.reported_to_police, body.why_not_reported ?? null,
-         body.police_outcome ?? null, decision.status, String(body.nonce)]);
+         body.police_outcome ?? null,
+         body.occurred_on ?? null, body.occurred_time ?? null,
+         acc.text, accountState, acc.text ? new Date() : null,
+         decision.status, String(body.nonce)]);
     } catch (e) {
       // The database is the last line of defence for every invariant. If it
       // rejects a row the validator let through, that is a bug in the
@@ -226,6 +240,37 @@ const publicServer = http.createServer(async (req, res) => {
     });
   }
 
+  // Anyone reading can flag an account. Two flags pull it automatically and a
+  // moderator can put it back: one flag is trivial censorship, and waiting for
+  // a human on a site with no human is how bad content stays up for a week.
+  // No id of the flagger is taken, so this is abusable by anyone patient. That
+  // is the accepted cost of not having accounts.
+  if (url.pathname === '/api/flag' && req.method === 'POST') {
+    const body = await readBody(req).catch(() => null);
+    // reports.id is a uuid, not a serial. Requiring an integer here rejected
+    // every real flag with a 400 while the tests happily reported that flagging
+    // "did not pull the account".
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (typeof body?.id !== 'string' || !UUID.test(body.id)) return json(res, 400, { ok: false });
+    // .allowed, not .ok. The first version of this line read `g.ok`, which is
+    // undefined, so every flag was answered 429 and the test that said "one
+    // flag does not pull an account" passed because no flag ever landed.
+    const g = abuse.check(req.socket.remoteAddress ?? 'unknown');
+    if (!g.allowed) return json(res, 429, { ok: false, error: 'slow_down' });
+    const r = await db.query(
+      `UPDATE reports
+          SET account_flags = account_flags + 1,
+              account_state = CASE WHEN account_state = 'published'
+                                    AND account_flags + 1 >= 2 THEN 'held'
+                                   ELSE account_state END
+        WHERE id = $1 AND account IS NOT NULL
+        RETURNING account_state`, [body.id]);
+    if (!r.rows.length) return json(res, 404, { ok: false });
+    // Nothing about the outcome is returned. A flagger learning whether their
+    // flag pulled something is a way to probe how many others have flagged it.
+    return json(res, 202, { ok: true });
+  }
+
   if (url.pathname === '/api/health') {
     return json(res, 200, { ok: true, last_publish: lastPublish });
   }
@@ -276,10 +321,52 @@ const modServer = http.createServer(async (req, res) => {
     return json(res, 200, { ok: true });
   }
 
+  // The pull list. Safi chose reactive moderation over a blocking queue: an
+  // account publishes on arrival unless a filter caught something, and this is
+  // the one screen that shows what is live so it can be taken down in one
+  // click. Default order is newest first, because the thing you need to see is
+  // whatever just appeared.
+  if (url.pathname === '/api/accounts') {
+    const state = url.searchParams.get('state') ?? 'published';
+    const rows = (await db.query(
+      `SELECT r.id, r.account, r.account_state, r.account_flags, r.account_at,
+              r.category, r.subcategory, r.ward_id, r.occurred_week,
+              w.name_en AS ward_name
+         FROM reports r
+         JOIN wards w ON w.id = r.ward_id
+        WHERE r.account IS NOT NULL AND r.account_state = $1
+        ORDER BY r.account_flags DESC, r.account_at DESC
+        LIMIT 200`, [state])).rows;
+    return json(res, 200, { rows });
+  }
+
+  if (url.pathname === '/api/account-state' && req.method === 'POST') {
+    const body = await readBody(req).catch(() => null);
+    if (!body?.id || !['held', 'published', 'pulled'].includes(body.to)) {
+      return json(res, 400, { ok: false, error: 'id and to are required' });
+    }
+    const before = await db.query(
+      `SELECT account_state FROM reports WHERE id = $1 AND account IS NOT NULL`, [body.id]);
+    if (!before.rows.length) return json(res, 404, { ok: false });
+    await db.query(
+      `UPDATE reports SET account_state = $2 WHERE id = $1`, [body.id, body.to]);
+    // A takedown is a moderation decision and is audited like one, so it cannot
+    // be done quietly. Its own table: moderation_events.to_status is the
+    // report_status enum and an account state is not a report status.
+    await db.query(
+      `INSERT INTO account_events (report_id, moderator, from_state, to_state, reason)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [body.id, body.moderator ?? 'demo', before.rows[0].account_state, body.to,
+       body.reason ?? null]);
+    return json(res, 200, { ok: true });
+  }
+
   if (url.pathname === '/api/audit') {
     const rows = (await db.query(
       `SELECT * FROM moderation_events ORDER BY id DESC LIMIT 100`)).rows;
-    return json(res, 200, { rows });
+    const accounts = (await db.query(
+      `SELECT * FROM account_events ORDER BY id DESC LIMIT 100`)).rows;
+    return json(res, 200, { rows, accounts });
   }
 
   if (url.pathname === '/api/publish-now' && req.method === 'POST') {

@@ -1,10 +1,14 @@
 // validate.js — the submit contract.
 //
-// The public tier accepts ENUM VALUES ONLY. There is no free-text field, and
-// this validator rejects any key it does not recognise, so a client cannot
-// smuggle a narrative, a name, a phone number or a coordinate into the write
-// path. Free text is the single most common deanonymisation vector in systems
-// like this one.
+// The public tier accepts ENUM VALUES ONLY, with two named exceptions added on
+// Safi's decision (2026-09-09): the exact day and time, and one free-text
+// account. Everything else is still closed vocabulary, and this validator still
+// rejects any key it does not recognise, so nothing else can be smuggled in.
+//
+// Free text remains the single most common deanonymisation vector in systems
+// like this one. It is accepted here, not trusted here: the text is handed to
+// server/redact.js before it reaches the database, and only the redacted
+// version is ever stored. This file's job is to bound it, not to clean it.
 //
 // The taxonomy comes from web/src/lib/taxonomy.js — one definition shared with
 // the frontend, and asserted against the database in the test suite.
@@ -17,10 +21,23 @@ import {
 export { CATEGORIES, HAZARDS };
 
 const REPORT_KEYS = new Set(['category', 'subcategory', 'ward_id', 'thana_id',
-  'occurred_week', 'time_band', 'amount_band', 'reported_to_police',
+  'occurred_week', 'occurred_on', 'occurred_time', 'account',
+  'time_band', 'amount_band', 'reported_to_police',
   'why_not_reported', 'police_outcome',
   'offender_count', 'offender_vehicle', 'weapon', 'approach',
   'challenge', 'nonce']);
+
+// Bigger than the 600 the database stores, because redaction shortens text and
+// a reporter who pasted a little too much should get a trimmed account rather
+// than a rejected form. Far below anything that could be used as a payload.
+const ACCOUNT_RAW_MAX = 2000;
+
+/** The Monday of the week containing an ISO date. Mirrors the SQL check. */
+function mondayOfISO(isoDay) {
+  const d = new Date(isoDay + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
 
 const HAZARD_KEYS = new Set(['category', 'subcategory', 'lon', 'lat', 'ward_id',
   'challenge', 'nonce']);
@@ -52,9 +69,37 @@ export function validate(body) {
   if (!TIME_BANDS.includes(time_band)) push('time_band');
   if (typeof reported_to_police !== 'boolean') push('reported_to_police');
 
-  // The client sends a week, never a date — but never trust the client with
-  // an invariant. The database checks this again.
+  // The week is still required and is still what gets published. The day is
+  // optional and must agree with it: two columns that can drift are two columns
+  // that will drift, and then the published week stops describing the stored
+  // day. The database asserts this again in 0010, because a validator is a
+  // convenience and a CHECK constraint is a guarantee.
   checkWeek(body.occurred_week, push);
+
+  if (body.occurred_on != null) {
+    if (typeof body.occurred_on !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.occurred_on)) {
+      push('occurred_on');
+    } else {
+      const d = new Date(body.occurred_on + 'T00:00:00Z');
+      if (Number.isNaN(+d)) push('occurred_on');
+      else if (d > new Date()) push('occurred_on cannot be in the future');
+      else if (mondayOfISO(body.occurred_on) !== body.occurred_week)
+        push('occurred_on is not inside occurred_week');
+    }
+  }
+
+  // A time with no day is a client bug, and a time on its own would be a
+  // slightly odd thing to store about someone.
+  if (body.occurred_time != null) {
+    if (typeof body.occurred_time !== 'string' || !/^\d{2}:\d{2}(:\d{2})?$/.test(body.occurred_time))
+      push('occurred_time');
+    else if (body.occurred_on == null) push('occurred_time without occurred_on');
+  }
+
+  if (body.account != null) {
+    if (typeof body.account !== 'string') push('account');
+    else if (body.account.length > ACCOUNT_RAW_MAX) push('account is too long');
+  }
 
   if (reported_to_police === false) {
     if (!WHY_NOT.includes(why_not_reported)) push('why_not_reported is required');

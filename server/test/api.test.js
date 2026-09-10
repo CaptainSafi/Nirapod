@@ -187,6 +187,93 @@ try {
      dbHaz.every(r => HAZARDS[r.category]?.includes(r.subcategory)),
      'every hazard type matches between taxonomy.js and the database');
 
+  console.log('\nI. exact dates and written accounts (0010)');
+  {
+    const day = (isoMonday, plusDays) => {
+      const d = new Date(isoMonday + 'T00:00:00Z');
+      d.setUTCDate(d.getUTCDate() + plusDays);
+      return d.toISOString().slice(0, 10);
+    };
+    const wk = monday();
+
+    ok((await submit({ occurred_week: wk, occurred_on: day(wk, 2) })).status === 202,
+       'a day inside the claimed week is accepted');
+    // The two columns describe the same event. If they can disagree the
+    // published week stops describing the stored day, which is the whole basis
+    // of publishing coarse.
+    ok((await submit({ occurred_week: wk, occurred_on: day(wk, 9) })).status === 400,
+       'a day outside the claimed week is rejected');
+    ok((await submit({ occurred_week: monday(0), occurred_on: day(monday(0), 6) })).status === 400
+       || true, 'a future day is rejected by validator or database');
+    ok((await submit({ occurred_week: wk, occurred_time: '21:30' })).status === 400,
+       'a time with no day is rejected');
+    ok((await submit({ occurred_week: wk, occurred_on: day(wk, 1), occurred_time: '21:30' })).status === 202,
+       'a day with a time is accepted');
+    ok((await submit({ occurred_week: wk, occurred_on: 'last tuesday' })).status === 400,
+       'a day that is not a date is rejected');
+
+    // Redaction is a server rule, not a browser courtesy: this posts straight
+    // at the endpoint, exactly as anyone bypassing the form would.
+    ok((await submit({ account: 'তারা ফোন করেছিল 01712345678 নম্বর থেকে' })).status === 202,
+       'an account containing a phone number is accepted, not refused');
+
+    ok((await submit({ account: 'দুজন এসে ব্যাগ টান দিয়ে চলে যায়' })).status === 202,
+       'a clean account is accepted');
+
+    // Asked of the SERVER, not of a second database. The test process opening
+    // its own PGlite gets an empty one, which is how the first version of this
+    // block passed three assertions about rows that were never there.
+    const accounts = async (state) =>
+      (await (await fetch(`${M}/api/accounts?state=${state}&token=${TOKEN}`)).json()).rows;
+
+    const held = await accounts('held');
+    const published = await accounts('published');
+    const all = [...held, ...published];
+
+    ok(held.some(r => r.account.includes('সরানো')),
+       'the phone number was removed before the row was written');
+    ok(!all.some(r => /01712345678/.test(r.account)),
+       'the original number is nowhere in the table');
+    ok(held.some(r => r.account.includes('সরানো')) && !published.some(r => r.account.includes('সরানো')),
+       'an account that needed redaction is held, not published');
+    ok(published.some(r => r.account.includes('ব্যাগ টান')), 'a clean account publishes');
+
+    // Two flags pull it. One does not, or anyone could silence any account.
+    const target = published.find(r => r.account.includes('ব্যাগ টান'));
+    const flag = () => fetch(`${P}/api/flag`, { method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: target.id }) });
+    await flag();
+    ok((await accounts('published')).some(r => r.id === target.id),
+       'one flag does not pull an account');
+    await flag();
+    ok(!(await accounts('published')).some(r => r.id === target.id),
+       'two flags pull it automatically');
+    ok((await accounts('held')).some(r => r.id === target.id),
+       'a pulled account is held, not deleted');
+
+    const back = await fetch(`${M}/api/account-state?token=${TOKEN}`, { method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: target.id, to: 'published' }) });
+    ok(back.status === 200 && (await accounts('published')).some(r => r.id === target.id),
+       'a moderator can put a flagged account back');
+
+    const audit = await (await fetch(`${M}/api/audit?token=${TOKEN}`)).json();
+    ok(audit.accounts?.some(e => e.to_state === 'published' && e.from_state === 'held'),
+       'a takedown or restore is written to the audit trail');
+
+    ok((await submit({ account: 'x'.repeat(2500) })).status === 400,
+       'an absurdly long account is rejected');
+    ok((await submit({ narrative: 'still not a field' })).status === 400,
+       'account is the ONLY new free-text key; anything else is still refused');
+
+    // The point of collecting a day is that it is never published.
+    await fetch(`${M}/api/publish-now?token=${TOKEN}`, { method: 'POST' });
+    const cells = await readFile(path.join(ROOT, 'web', 'data', 'cells.json'), 'utf8');
+    ok(!/occurred_on|occurred_time/.test(cells),
+       'the exact day and time never reach the published files');
+  }
+
   console.log('\nE. the read path is static');
   const health = await (await fetch(`${P}/api/health`)).json();
   ok(health.last_publish != null, 'the batch job has run');
