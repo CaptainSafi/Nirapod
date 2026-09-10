@@ -31,12 +31,13 @@ if (!url) {
   process.exit(2);
 }
 
-const client = new pg.Client({
-  connectionString: url,
-  // Neon terminates TLS at its proxy with a certificate this client will not
-  // have a root for in every environment; the connection is still encrypted.
-  ssl: { rejectUnauthorized: false },
-});
+// No ssl override. Neon's certificate chains to a public root, so the default
+// verification works, and rejectUnauthorized:false would have accepted any
+// certificate at all: an encrypted connection to whoever answered. For a
+// database of reports about police, that is the wrong default to ship.
+// Append sslmode=verify-full to the connection string to silence pg's warning
+// about the meaning of sslmode=require changing in the next major version.
+const client = new pg.Client({ connectionString: url });
 await client.connect();
 
 await client.query(`

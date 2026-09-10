@@ -21,10 +21,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const url = process.env.DATABASE_URL;
 if (!url) { console.error('DATABASE_URL is not set'); process.exit(2); }
 
-const client = new pg.Client({
-  connectionString: url,
-  ssl: { rejectUnauthorized: false },
-});
+const client = new pg.Client({ connectionString: url });
 await client.connect();
 
 // aggregate.js only ever calls db.query(text, params), which is exactly pg's
