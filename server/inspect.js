@@ -31,6 +31,18 @@ if (del !== -1) {
   process.exit(0);
 }
 
+// pg hands back a `date` column as a JS Date at LOCAL midnight. toISOString()
+// then converts to UTC and, from Dhaka at UTC+6, prints the previous day. The
+// first version of this file did that and made a correctly stored 2026-08-31
+// read as 2026-08-30, which looks exactly like an off-by-one in the data.
+// Read the local parts instead, which are the parts Postgres actually sent.
+const day = (d) => {
+  if (d == null) return '(none)';
+  if (typeof d === 'string') return d.slice(0, 10);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+};
+
 const counts = (await client.query(`
   SELECT status, count(*)::int n FROM reports GROUP BY status ORDER BY status`)).rows;
 console.log('\nREPORTS BY STATUS');
@@ -59,8 +71,7 @@ console.log('\nMOST RECENT');
 for (const r of rows) {
   console.log(`\n  ${r.id}`);
   console.log(`    ${r.category}/${r.subcategory}  ward ${r.ward_id} (${r.ward})  [${r.status}]`);
-  console.log(`    week ${r.occurred_week?.toISOString?.().slice(0,10) ?? r.occurred_week}` +
-              `   day ${r.occurred_on?.toISOString?.().slice(0,10) ?? r.occurred_on ?? '(none)'}` +
+  console.log(`    week ${day(r.occurred_week)}   day ${day(r.occurred_on)}` +
               `   time ${r.occurred_time ?? '(none)'}   band ${r.time_band}`);
   if (r.account) {
     console.log(`    account [${r.account_state}, ${r.account_flags} flags]:`);
