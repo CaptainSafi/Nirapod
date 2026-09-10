@@ -12,5 +12,8 @@
     "build:review": "node scripts/build-review.js",
     "build:beta": "node scripts/build-beta.js",
     "build:pages": "npm run setup && node scripts/build-beta.js --light"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.2"
   }
 }
