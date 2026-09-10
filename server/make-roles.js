@@ -46,11 +46,19 @@ for (const role of ROLES) {
     process.exit(1);
   }
   const pw = password();
-  // Identifiers cannot be parameterised; the role names are a fixed list above,
-  // never user input. The password IS parameterised via format(%L).
-  await client.query(
-    `DO $$ BEGIN EXECUTE format('ALTER ROLE %I WITH LOGIN PASSWORD %L', $1, $2); END $$`,
-    [role, pw]);
+  // ALTER ROLE takes no bind parameters, and neither does a DO block: the first
+  // version of this passed $1/$2 into DO $$ ... $$ and Postgres answered "bind
+  // message supplies 2 parameters, but prepared statement requires 0".
+  //
+  // So build the statement in the database and then run it. format() quotes the
+  // identifier with %I and the password with %L, which is the correct escaping
+  // rather than my idea of it. The role names come from the fixed list above,
+  // never from input, but the password is random bytes and deserves real
+  // quoting.
+  const stmt = (await client.query(
+    `SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', $1::text, $2::text) AS sql`,
+    [role, pw])).rows[0].sql;
+  await client.query(stmt);
   made[role] = pw;
 }
 
