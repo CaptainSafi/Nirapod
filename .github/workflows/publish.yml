@@ -50,7 +50,7 @@ jobs:
           # on reports; it cannot write, and it cannot read the moderation queue.
           DATABASE_URL: ${{ secrets.DATABASE_URL_AGGREGATOR }}
           MODE: live
-        run: node scripts/publish-batch.js
+        run: node server/publish-batch.js
 
       - name: commit only if something changed
         run: |

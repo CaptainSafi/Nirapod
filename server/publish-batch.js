@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // publish-batch.js — run the batch publish against a real Postgres, once.
 //
-//   DATABASE_URL='postgres://...' MODE=live node scripts/publish-batch.js
+//   DATABASE_URL='postgres://...' MODE=live node server/publish-batch.js
 //
 // Called by .github/workflows/publish.yml on a schedule. It runs the SAME
-// server/aggregate.js the demo and the tests run: every suppression rule that
+// aggregate.js the demo and the tests run: every suppression rule that
 // the 74 tests assert is the code that runs here. That is the whole reason the
 // batch stayed in Node instead of being ported to a Worker.
 //
@@ -13,8 +13,8 @@
 import pg from 'pg';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { publish } from '../server/aggregate.js';
-import { SEEDS } from '../server/db.js';
+import { publish } from './aggregate.js';
+import { SEEDS } from './db.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

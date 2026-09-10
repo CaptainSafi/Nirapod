@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // migrate.js — apply db/migrations to a real Postgres, in order, once.
 //
-//   DATABASE_URL='postgres://...' node scripts/migrate.js
+//   DATABASE_URL='postgres://...' node server/migrate.js
 //
-// The demo path (server/db.js) rewrites a few PostGIS lines because PGlite has
+// The demo path (db.js, beside this file) rewrites a few PostGIS lines because PGlite has
 // no extension for them. THIS DOES NOT. Production gets the migrations exactly
 // as written, which is the point of keeping them free of demo-specific
 // branching: what is under test is what is deployed.
@@ -11,6 +11,11 @@
 // Applied migrations are recorded in schema_migrations, so running this again
 // is a no-op rather than an error. Each file runs inside its own transaction:
 // the migrations already say BEGIN/COMMIT, so this only wraps the bookkeeping.
+//
+// It lives in server/ rather than scripts/ because it needs `pg`, and `pg` is a
+// server dependency. Node resolves node_modules from the file's own directory
+// upward, so the same file under scripts/ could not find it without installing
+// the driver a second time at the repo root.
 import pg from 'pg';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
