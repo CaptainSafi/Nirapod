@@ -1,0 +1,69 @@
+# publish.yml — the batch job, on a schedule.
+#
+# WHY HERE AND NOT IN A WORKER. The published aggregates are static files
+# committed to this repo, which is what keeps the database out of the path of
+# every reader. Cloudflare's free plan gives a Worker 10ms of CPU per
+# invocation, and serialising the whole aggregate set will pass that the moment
+# there is real data in it. Actions has no such limit, and it lets the batch run
+# server/aggregate.js UNCHANGED rather than porting the most delicate code in
+# the project to a different runtime.
+#
+# The commit it makes triggers the existing Cloudflare Pages build, so the
+# deploy path is the one that already works.
+#
+# COST: a private repo gets 2,000 Actions minutes a month free. Hourly runs at
+# well under a minute each use roughly 720.
+
+name: publish aggregates
+
+on:
+  schedule:
+    # Hourly. The site tells readers the data is a batch, not a live feed, and
+    # an hour is frequent enough for a ward count while being far too coarse to
+    # infer when any individual report arrived.
+    - cron: '17 * * * *'
+  workflow_dispatch:        # so a human can force a publish after moderating
+
+concurrency:
+  # Two publishes racing would both try to commit the same files.
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # the only permission this needs
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: install server deps
+        run: npm --prefix server ci --no-audit --no-fund
+
+      - name: publish
+        env:
+          # Set in the repository's secrets. The aggregator role is SELECT-only
+          # on reports; it cannot write, and it cannot read the moderation queue.
+          DATABASE_URL: ${{ secrets.DATABASE_URL_AGGREGATOR }}
+          MODE: live
+        run: node scripts/publish-batch.js
+
+      - name: commit only if something changed
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- web/data; then
+            echo "no change in web/data; nothing to publish"
+            exit 0
+          fi
+          git config user.name  "nirapod-publisher"
+          git config user.email "noreply@nirapod.site"
+          git add web/data
+          # The message carries no counts. A commit history that says
+          # "3 reports in ward 86" republishes exactly what the thresholds
+          # exist to suppress, in a place nobody thinks to check.
+          git commit -m "publish aggregates $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push

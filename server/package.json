@@ -8,6 +8,7 @@
     "test": "node test/api.test.js"
   },
   "dependencies": {
-    "@electric-sql/pglite": "^0.2.17"
+    "@electric-sql/pglite": "^0.2.17",
+    "pg": "^8.23.0"
   }
 }
