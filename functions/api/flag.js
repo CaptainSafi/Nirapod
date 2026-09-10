@@ -17,16 +17,12 @@ export async function onRequestPost({ request, env }) {
   if (typeof body?.id !== 'string' || !UUID.test(body.id))
     return json(400, { ok: false });
 
+  // An UPDATE the submit role does not have and must not get: UPDATE on reports
+  // would let this credential rewrite anybody's account. flag_account() is
+  // SECURITY DEFINER and touches exactly two columns of one row. See 0012.
   const db = connect(env);
-  const r = await db.query(
-    `UPDATE reports
-        SET account_flags = account_flags + 1,
-            account_state = CASE WHEN account_state = 'published'
-                                  AND account_flags + 1 >= 2 THEN 'held'
-                                 ELSE account_state END
-      WHERE id = $1 AND account IS NOT NULL
-      RETURNING id`, [body.id]);
-  if (!r.rows.length) return json(404, { ok: false });
+  const r = await db.query(`SELECT flag_account($1) AS found`, [body.id]);
+  if (!r.rows[0]?.found) return json(404, { ok: false });
 
   // Nothing about the outcome is returned. Telling a flagger whether their flag
   // pulled something is a way to probe how many others have already flagged it.

@@ -24,22 +24,27 @@ export async function onRequestPost({ request, env }) {
 
   const db = connect(env);
 
-  // Routing needs to know how full the target cell already is.
-  const [kRow, cellRow, recentRow] = await Promise.all([
-    db.query(`SELECT k_min FROM display_thresholds WHERE category = $1`, [body.category]),
-    db.query(`SELECT count(*)::int n FROM reports
-               WHERE status='approved' AND ward_id=$1 AND category=$2 AND time_band=$3`,
-             [body.ward_id, body.category, body.time_band]),
-    db.query(`SELECT count(*)::int n FROM reports
-               WHERE ward_id=$1 AND category=$2 AND submitted_day = CURRENT_DATE`,
-             [body.ward_id, body.category]),
-  ]);
-  if (!kRow.rows.length) return json(400, { ok: false, error: 'unknown category' });
+  // Routing needs two facts about the database, and the credential this runs
+  // with cannot SELECT anything: nirapod_submit has INSERT and nothing else, so
+  // that a leak of this string lets someone add rows and read none. See 0012.
+  //
+  // submit_context() is SECURITY DEFINER and returns two booleans rather than
+  // the counts, because route() only ever compares them. Whether a cell is above
+  // its threshold is already visible on the published map; the count is not, and
+  // the count is what the thresholds exist to hide.
+  const ctx = await db.query(
+    `SELECT cell_thin, burst FROM submit_context($1, $2, $3)`,
+    [body.category, body.ward_id, body.time_band]);
+  if (!ctx.rows.length) return json(400, { ok: false, error: 'unknown category' });
+  const { cell_thin, burst } = ctx.rows[0];
 
+  // rules.js is shared with the Node server and the tests, so it keeps its
+  // numeric signature and this translates. The numbers below are stand-ins that
+  // reproduce the same two comparisons; they are never stored or shown.
   const decision = route(body, {
-    cellN: cellRow.rows[0].n,
-    kMin: kRow.rows[0].k_min,
-    recent: recentRow.rows[0].n,
+    cellN: cell_thin ? 0 : 1,
+    kMin: 1,
+    recent: burst ? 5 : 0,
   });
 
   // Redacted before the insert, and the original is never written anywhere.

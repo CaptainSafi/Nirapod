@@ -20,10 +20,9 @@ export async function onRequestPost({ request, env }) {
   if (!p.ok) return json(400, { ok: false, error: `pow_${p.reason}` });
 
   const db = connect(env);
-  const nearby = await db.query(
-    `SELECT count(*)::int n FROM hazards
-      WHERE ward_id = $1 AND reported_day = CURRENT_DATE`, [body.ward_id]);
-  const decision = routeHazard(body, { nearbyToday: nearby.rows[0].n });
+  // Same reason as submit: the role cannot SELECT. See 0012.
+  const ctx = await db.query(`SELECT burst FROM hazard_context($1)`, [body.ward_id]);
+  const decision = routeHazard(body, { nearbyToday: ctx.rows[0]?.burst ? 10 : 0 });
 
   try {
     await db.query(
