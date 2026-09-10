@@ -40,6 +40,10 @@ export async function publish(db, outDir, { seedsDir, demo = false, mode = null 
   const summary = (await db.query(`SELECT * FROM public_city_summary()`)).rows;
   const hazards = (await db.query(`SELECT * FROM public_hazards()`)).rows;
   const methods = (await db.query(`SELECT * FROM public_method_patterns()`)).rows;
+  // Written accounts, already gated by public_accounts() on the threshold of
+  // the cell they belong to. See 0011: an account next to a suppressed count
+  // publishes the very fact the suppression hides.
+  const accounts = (await db.query(`SELECT * FROM public_accounts()`)).rows;
   const scorecards = (await db.query(`SELECT * FROM public_thana_scorecards()`)).rows;
   const gap = (await db.query(`SELECT * FROM public_reporting_gap($1)`, [5])).rows;
   const press = (await db.query(`SELECT * FROM press_cell_counts`)).rows;
@@ -183,6 +187,9 @@ export async function publish(db, outDir, { seedsDir, demo = false, mode = null 
       })),
     },
     'gap.json': { generated_at, districts: gap },
+    // Its own file, not folded into cells.json, so a reader who only wants the
+    // map never downloads other people's accounts of what happened to them.
+    'accounts.json': { generated_at, accounts },
     'wards.json': { generated_at, wards },
     'meta.json': {
       generated_at,

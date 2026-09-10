@@ -267,9 +267,42 @@ try {
     ok((await submit({ narrative: 'still not a field' })).status === 400,
        'account is the ONLY new free-text key; anything else is still refused');
 
+    // THE ONE THAT MATTERS. Suppression is meaningless if the paragraph
+    // underneath the hidden number says what the number was hiding.
+    await fetch(`${M}/api/publish-now?token=${TOKEN}`, { method: 'POST' });
+    const accountsFile = JSON.parse(await readFile(
+      path.join(ROOT, 'web', 'data', 'accounts.json'), 'utf8'));
+    const agg = JSON.parse(await readFile(
+      path.join(ROOT, 'web', 'data', 'aggregate.json'), 'utf8'));
+    const publishedCell = new Set(
+      (agg.cells ?? []).filter(c => c.crowd_n != null)
+        .map(c => `${c.level}:${c.area}:${c.category}`));
+
+    ok(Array.isArray(accountsFile.accounts), 'accounts publish as their own file');
+
+    // The gate, asserted positively rather than by an every() over an empty
+    // array, which passes and proves nothing. The clean account IS marked
+    // published in the moderation view, and it is STILL absent from the public
+    // file, because its ward and category are nowhere near the threshold of 5.
+    const stillPublished = await accounts('published');
+    ok(stillPublished.some(r => r.account.includes('ব্যাগ টান')),
+       'the clean account is still marked published server-side');
+    ok(!accountsFile.accounts.some(a => a.account.includes('ব্যাগ টান')),
+       'an account is withheld while its own cell is below threshold');
+    ok(accountsFile.accounts.every(a => publishedCell.has(`ward:${a.ward_id}:${a.category}`)),
+       'no account appears for a cell whose count is suppressed');
+    ok(!accountsFile.accounts.some(a => a.account.includes('সরানো')),
+       'a redacted-and-held account is not published');
+    ok(!JSON.stringify(accountsFile).includes('occurred_on'),
+       'accounts carry the week, never the day');
+
+    const personDirected = ['harassment', 'assault', 'abduction'];
+    ok(!accountsFile.accounts.some(a => personDirected.includes(a.category)),
+       'person-directed categories publish no accounts at all');
+
     // The point of collecting a day is that it is never published.
     await fetch(`${M}/api/publish-now?token=${TOKEN}`, { method: 'POST' });
-    const cells = await readFile(path.join(ROOT, 'web', 'data', 'cells.json'), 'utf8');
+    const cells = await readFile(path.join(ROOT, 'web', 'data', 'aggregate.json'), 'utf8');
     ok(!/occurred_on|occurred_time/.test(cells),
        'the exact day and time never reach the published files');
   }
@@ -278,6 +311,13 @@ try {
   const health = await (await fetch(`${P}/api/health`)).json();
   ok(health.last_publish != null, 'the batch job has run');
   ok((await fetch(`${P}/data/aggregate.json`)).status === 200, 'aggregates are served as a static file');
+} catch (e) {
+  // Without this the suite had try/finally and no catch, and process.exit() in
+  // the finally discarded the pending exception. A crash halfway through
+  // printed "0 failed" and exited 0, which is the worst possible way for a test
+  // suite to be wrong: it hid five assertions that never ran.
+  fail++;
+  console.log(`\n  FAIL  the suite threw before finishing: ${e?.stack ?? e}`);
 } finally {
   child.kill();
   console.log(`\n${pass} passed, ${fail} failed`);
