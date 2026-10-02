@@ -29,7 +29,7 @@ something that works in dev works deployed.
 | `npm start` | API only, serving the built static site on :8787. No hot reload |
 | `npm run build` | Rebuild `web/build` |
 | `npm run build:review` | Build a folder you can upload to any static host — see below |
-| `npm test` | The 47 end-to-end checks |
+| `npm test` | The 74 end-to-end checks |
 | `npm run setup` | Install both dependency trees without starting anything |
 
 `start-demo.cmd` (double-click) and `start-demo.ps1` do the same as `npm start`
@@ -56,7 +56,7 @@ behaviour at low volume, not a bug.
 ## Tests
 
 ```bash
-cd server && npm test            # 25 end-to-end checks against both servers
+cd server && npm test            # 74 end-to-end checks against both servers
 ```
 
 Database invariants need a real Postgres with PostGIS (they assert on PostGIS
